@@ -21,8 +21,9 @@ pio.renderers.default = 'browser'
 
 
 # Create data
-xo = np.linspace(0, 1, 1000) 
-yo = np.sin(10*xo*math.pi)+0.01*np.random.rand(1000) 
+xo = np.linspace(0, 1, 1000)
+f = 10 
+yo = np.sin(f*2*xo*math.pi)+0.01*np.random.randn(1000) # 0.1 is standard deviation 
 
 # data admin 
 x = torch.from_numpy(xo)
@@ -39,17 +40,21 @@ ytr = (y[idx_tr])
 
 
 # Scale input data
-train_x = ((xtr - xtr.mean()) / xtr.std()).unsqueeze(-1)
+
+train_x = ((xtr)) # not scaled because it will change frequency + period 
 train_y = (ytr - ytr.mean()) / ytr.std()
 
-x_all = ((x - x.mean()) / x.std()).unsqueeze(-1)
+x_all = ((x)) 
+y_all = (y-ytr.mean())/ytr.std()
 
 # Model set up 
 class ExactGPModel(gpytorch.models.ExactGP): 
     def __init__(self, train_x, train_y, likelihood): 
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood) 
-        self.mean_module = gpytorch.means.ConstantMean() 
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()) 
+        self.mean_module = gpytorch.means.ZeroMean() 
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel()) 
+        self.covar_module.base_kernel.initialize(period_length=1.11/(2*f))
+        self.covar_module.initialize(outputscale=0.5) # check me! 
         
     def forward(self, x): 
         mean_x = self.mean_module(x) 
@@ -60,9 +65,9 @@ class ExactGPModel(gpytorch.models.ExactGP):
 likelihood = gpytorch.likelihoods.GaussianLikelihood() 
 model = ExactGPModel(train_x, train_y, likelihood) 
 # Set the noise value (optional)
-# likelihood.initialize(noise=0.1)
+# likelihood.initialize(noise=0.01)
 # Freeze it
-#likelihood.raw_noise.requires_grad_(False)
+# likelihood.raw_noise.requires_grad_(False)
 
 # model.covar_module.base_kernel.initialize(period_length=0.2)
 
@@ -79,7 +84,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 # Find marginal log likelihood 
 mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model) 
 
-training_iter = 300 
+training_iter = 1000 
 model.train() 
 likelihood.train() 
 
@@ -91,7 +96,8 @@ for i in range(training_iter):
     # Calc loss and backprop gradients 
     loss = -mll(output, train_y) 
     loss.backward() 
-    print('Iter %d/%d - Loss: %.3f - Period: %.3f - Noise: %.3f' % ( i + 1, training_iter, loss.item(), model.covar_module.base_kernel.period_length.item(), model.likelihood.noise.item() )) 
+    print('Iter %d/%d - Loss: %.3f  - Period: %.3f - Noise: %.3f - Signal Variance: %.3f' % ( i + 1, training_iter, loss.item(), model.covar_module.base_kernel.period_length.item(), model.likelihood.noise.item(), model.covar_module.outputscale
+ )) 
     optimizer.step()
     
 # Get into evaluation (predictive posterior) mode 
@@ -100,29 +106,32 @@ likelihood.eval()
 
 # Make predictions on the test data 
 with torch.no_grad(), gpytorch.settings.fast_pred_var(): 
-    trained_pred_dist = likelihood(model(x_all)) 
-    observed_pred = likelihood(model(x))
+    #trained_pred_dist = likelihood(model(train_x)) 
+    observed_pred = likelihood(model(x_all))
 
-# Plot figure    
-# fig = go.Figure()
+  
+# Unscale data 
+y_unscaled = observed_pred.mean*ytr.std()+ytr.mean()
 
-fig, ax = plt.subplots(1, 1, figsize=(4, 3))
-# Get upper and lower confidence bounds
+
+# # Get upper and lower confidence bounds
 lower, upper = observed_pred.confidence_region()
 
-ax.plot(xtr,ytr,".")
-ax.plot(xo,observed_pred.mean)
-# Shade between the lower and upper confidence bounds
-ax.fill_between(x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5)
-ax.set_ylim([-3, 3])
-ax.legend(['Observed Data', 'Mean', 'Confidence'])
+lower_unscaled = (lower*ytr.std()+ytr.mean()).detach().numpy()
+upper_unscaled = (upper*ytr.std()+ytr.mean()).detach().numpy()
+
+# Plot figure    
+fig = go.Figure()
+
+fig.add_trace(go.Scatter(x=xo, y=yo, mode='lines', name='Original'))
+fig.add_trace(go.Scatter(x=xo, y=y_unscaled, mode='lines', name='Prediction'))
+fig.add_trace(go.Scatter(x=xtr.ravel(), y=ytr, mode='markers', name='Training'))
+fig.add_trace(go.Scatter(x=np.concatenate([xo,xo[::-1]]), y=np.concatenate([upper_unscaled, lower_unscaled[::-1]]), fill = 'toself', name="Confidence Region"))
 
 
-
-# fig.add_trace(go.Scatter(x=xo, y=y, mode='lines', name='Original'))
-# fig.add_trace(go.Scatter(x=xo, y=observed_pred.mean, mode='lines', name='Prediction'))
-# fig.add_trace(go.Scatter(x=xtr.ravel(), y=ytr, mode='markers', name='Training'))
-
-ax.plot(xo, y)
-# ax.plot(train_x,train_y,".")
 fig.show()
+
+
+MSE = (gpytorch.metrics.mean_squared_error(observed_pred,y_all,squared=True))
+NMSE = 100* MSE * (train_y.std())**2
+print(f'NMSE: {NMSE:.3f}')

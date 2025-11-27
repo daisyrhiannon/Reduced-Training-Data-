@@ -158,8 +158,7 @@ with gpytorch.settings.cholesky_jitter(1e-1):
     
 # unscale data
 
-y_unscaled = observed_pred.mean.numpy()*y_std+y_mean
-
+y_unscaled = observed_pred.mean.numpy()*y_std+y_mean()
 
 # Get into evaluation (predictive posterior) mode
 model.eval()

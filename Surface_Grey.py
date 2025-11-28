@@ -23,8 +23,9 @@ x1o, x2o = np.meshgrid(np.arange(-1, 1, 0.02), np.arange(-1, 1, 0.02))
 x1o_flat = x1o.ravel()   # or x1o.reshape(-1)
 x2o_flat = x2o.ravel()
 yo = np.sqrt(np.abs(x2o)) * np.sin(4 * x1o)
-x = torch.from_numpy(np.hstack([x1o_flat.reshape(-1,1), x2o_flat.reshape(-1,1)])).float()
-y = torch.from_numpy(yo.ravel()).float()
+x = np.hstack([x1o_flat.reshape(-1,1), x2o_flat.reshape(-1,1)])
+y = yo.ravel()
+
 
 # Make training data 
 step=10
@@ -32,21 +33,21 @@ x1_sub = x1o[::step, ::step]
 x2_sub = x2o[::step, ::step]
 y_sub = yo[::step, ::step]
 
-x_train = torch.from_numpy(np.hstack([x1_sub.ravel().reshape(-1,1),x2_sub.ravel().reshape(-1,1)])).float()
-# y_train = torch.from_numpy(y_sub.ravel()).float()
+x_train = np.hstack([x1_sub.ravel().reshape(-1,1),x2_sub.ravel().reshape(-1,1)])
+# y_train = (y_sub.ravel())
 
-y_train_silent = torch.from_numpy(y_sub.ravel()).float() 
+y_train_silent = y_sub.ravel()
 
 with torch.random.fork_rng(): 
     torch.manual_seed(25) 
-    y_train = y_train_silent + 0.01*torch.randn_like(y_train_silent)
+    y_train = y_train_silent + 0.01*np.random.randn(y_train_silent.size)
 
 
 
 
 # Make test data
 x_test = x
-x_test=x_test.float()
+
 
 
 # Compute scalers (save these to unscale later)
@@ -54,19 +55,20 @@ x_mean, x_std = x_train.mean(0), x_train.std(0)
 x_std[x_std == 0] = 1.0
 x_train_scaled = (x_train - x_mean) / x_std
 
-# y_mean, y_std = y_train.mean(), y_train.std()
-# if y_std == 0: y_std = 1.0
-# y_train_scaled = (y_train - y_mean) / y_std
+y_mean, y_std = y_train.mean(), y_train.std()
+if y_std == 0: y_std = 1.0
+y_train_scaled = (y_train - y_mean) / y_std
 
-# x_mean_2, x_std_2 = x_test.mean(), x_test.std()
-# if x_std_2 == 0: x_std_2 = 1.0
-# x_test_scaled = (x_test - x_mean_2) / x_std_2
+x_mean_2, x_std_2 = x_test.mean(), x_test.std()
+if x_std_2 == 0: x_std_2 = 1.0
+x_test_scaled = (x_test - x_mean_2) / x_std_2
 
-# # replace train tensors (and ensure same transform applied to x_test later)
-# x_train_2 = x_train_scaled
-# y_train_2 = y_train_scaled
 
-# x_test_2= x_test_scaled
+# Make tensors
+x_train_2 = torch.from_numpy(x_train_scaled)
+y_train_2 = torch.from_numpy(y_train_scaled)
+
+x_test_2= torch.from_numpy(x_test_scaled)
 
 
 # # visualise training data in 3d
@@ -113,7 +115,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 # initialize likelihood and model
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
-model = ExactGPModel(x_train, y_train, likelihood)
+model = ExactGPModel(x_train_2, y_train_2, likelihood)
 
 
 # Find optimal model hyperparameters
@@ -131,7 +133,7 @@ mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 #         observed_pred = likelihood(model(x_test))
 
 
-training_iter = 100
+training_iter = 1000
 
 model.train()
 likelihood.train()
@@ -141,9 +143,9 @@ with gpytorch.settings.cholesky_jitter(1e-1):
         # Zero gradients from previous iteration
         optimizer.zero_grad()
         # Output from model
-        output = model(x_train)
+        output = model(x_train_2)
         # Calc loss and backprop gradients
-        loss = -mll(output, y_train)
+        loss = -mll(output, y_train_2)
         loss.backward()
         rbf=model.covar_module.base_kernel.kernels[0]
         print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
@@ -161,8 +163,8 @@ likelihood.eval()
 # Make predictions by feeding model through likelihood
 with torch.no_grad(), gpytorch.settings.fast_pred_var():
     # x_test = torch.from_numpy(np.hstack([x1o_flat.reshape(-1,1), x2o_flat.reshape(-1,1)])).float()
-    trained_pred_dist = likelihood(model(x_test))
-    observed_pred = likelihood(model(x_test))
+    trained_pred_dist = likelihood(model(x_test_2))
+    observed_pred = likelihood(model(x_test_2))
 
     
 # fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -208,5 +210,5 @@ fig.update_layout(legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         borderwidth=1))
 fig.show()
 
-MSE = (gpytorch.metrics.mean_squared_error(trained_pred_dist,y_test,squared=True))
+MSE = (gpytorch.metrics.mean_squared_error(trained_pred_dist,y,squared=True))
 print(f'MSE: {MSE:.3f}')

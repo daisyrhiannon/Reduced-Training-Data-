@@ -23,7 +23,7 @@ pio.renderers.default = 'browser'
 # Create data
 xo = np.linspace(0, 1, 1000)
 f = 10 
-yo = np.sin(f*2*xo*math.pi)+0.01*np.random.randn(1000) # 0.1 is standard deviation 
+yo = np.sin(f*2*xo*math.pi)+0.01*np.random.randn(1000) # number at front of noise is standard deviation 
 
 # data admin 
 x = torch.from_numpy(xo)
@@ -64,12 +64,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood() 
 model = ExactGPModel(train_x, train_y, likelihood) 
-# Set the noise value (optional)
-# likelihood.initialize(noise=0.01)
-# Freeze it
-# likelihood.raw_noise.requires_grad_(False)
 
-# model.covar_module.base_kernel.initialize(period_length=0.2)
 
 
 
@@ -133,5 +128,6 @@ fig.show()
 
 
 MSE = (gpytorch.metrics.mean_squared_error(observed_pred,y_all,squared=True))
+MSE2 =(gpytorch.metrics.mean_squared_error(y_unscaled,y,squared=True)) 
 NMSE = 100* MSE * (train_y.std())**2
 print(f'NMSE: {NMSE:.3f}')

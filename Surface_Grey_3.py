@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Nov 27 10:57:50 2025
+Created on Wed Dec 10 11:26:51 2025
 
 @author: mep24db
 """
@@ -74,9 +74,9 @@ x_test_scaled = (x - x_mean) / x_std
 # fig.show()
 
 # Make tensors 
-x_train_scaled_tensor = torch.from_numpy(x_train_scaled).double()
-y_train_scaled_tensor = torch.from_numpy(y_train_scaled).double()
-x_test_scaled_tensor = torch.from_numpy(x_test_scaled).double()
+x_train_scaled_tensor = torch.from_numpy(x_train_scaled).float()
+y_train_scaled_tensor = torch.from_numpy(y_train_scaled).float()
+x_test_scaled_tensor = torch.from_numpy(x_test_scaled).float()
 
 
 # Define model 
@@ -84,8 +84,10 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, x_train_scaled_tensor, y_train_scaled_tensor, likelihood):
         super(ExactGPModel, self).__init__(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        # cos = gpytorch.kernels.CosineKernel().initialize(period_length=1.0)
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        cos = gpytorch.kernels.CosineKernel()
+        rbf = gpytorch.kernels.RBFKernel(ard_num_dims=2)
+        product = rbf*cos
+        self.covar_module = gpytorch.kernels.ScaleKernel(product)
         # self.covar_module.base_kernel.kernels[1].initialize(period_length=1/f)
 
     def forward(self, x):
@@ -96,11 +98,18 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
-likelihood.initialize(noise=0.05) 
+likelihood.noise = torch.tensor(1e-4)
 model = ExactGPModel(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
 
-model.double()
-likelihood.double()
+
+# initialise hyperparameters 
+product = model.covar_module.base_kernel
+rbf = product.kernels[0]   
+cos = product.kernels[1] 
+cos.period_length = torch.tensor(2*np.pi / f).float()
+rbf.lengthscale = torch.tensor([0.3, 0.5]).float()
+model.covar_module.outputscale = torch.tensor(np.var(y)).float()
+model.mean_module.constant = torch.tensor(np.mean(y)).float()
 
 
 # Find optimal model hyperparameters
@@ -130,8 +139,8 @@ with gpytorch.settings.cholesky_jitter(1e-1):
         # Calc loss and backprop gradients 
         loss = -mll(output, y_train_scaled_tensor) 
         loss.backward() 
-        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f' % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item())
-         )
+        ls = rbf.lengthscale.detach().cpu().numpy()
+        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Cos Period: %.3f - Lengthscales: %s'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), cos.period_length.item(), np.array2string(ls, precision=3)))
         optimizer.step()
             
     

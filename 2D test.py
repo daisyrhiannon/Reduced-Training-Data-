@@ -53,7 +53,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood) 
         self.mean_module = gpytorch.means.ZeroMean() 
         self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel()) 
-        self.covar_module.base_kernel.initialize(period_length=1.11/(2*f))
+        self.covar_module.base_kernel.initialize(period_length=1.07/(2*f))
         self.covar_module.initialize(outputscale=0.5) # check me! 
         
     def forward(self, x): 
@@ -79,7 +79,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 # Find marginal log likelihood 
 mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model) 
 
-training_iter = 1000 
+training_iter = 300 
 model.train() 
 likelihood.train() 
 
@@ -126,8 +126,13 @@ fig.add_trace(go.Scatter(x=np.concatenate([xo,xo[::-1]]), y=np.concatenate([uppe
 
 fig.show()
 
+def MSE(ypred,ytest):
+    MSE = np.mean(((ypred-ytest)**2))
+    return MSE
 
-MSE = (gpytorch.metrics.mean_squared_error(observed_pred,y_all,squared=True))
-MSE2 =(gpytorch.metrics.mean_squared_error(y_unscaled,y,squared=True)) 
-NMSE = 100* MSE * (train_y.std())**2
-print(f'NMSE: {NMSE:.3f}')
+def nMSE(ypred,ytest):
+    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
+    return nMSE
+    
+errorN = nMSE(y_unscaled.numpy(),yo)
+print(errorN)

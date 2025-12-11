@@ -13,6 +13,7 @@ import gpytorch
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import copy
+from gpytorch.constraints import Interval
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -42,6 +43,7 @@ x2_sub = x2o[::step, ::step]
 y_sub = yo[::step, ::step]
 
 train_x = np.hstack([x1_sub.ravel().reshape(-1,1),x2_sub.ravel().reshape(-1,1)])
+np.random.seed(11)
 train_y = y_sub.ravel() + 0.01*np.random.randn(y_sub.size)
 
 
@@ -88,7 +90,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         rbf = gpytorch.kernels.RBFKernel(ard_num_dims=2)
         product = rbf*cos
         self.covar_module = gpytorch.kernels.ScaleKernel(product)
-        # self.covar_module.base_kernel.kernels[1].initialize(period_length=1/f)
+     
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -102,15 +104,41 @@ likelihood.noise = torch.tensor(1e-4)
 model = ExactGPModel(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
 
 
-# initialise hyperparameters 
+# set hyperparameters and bounds
 product = model.covar_module.base_kernel
 rbf = product.kernels[0]   
 cos = product.kernels[1] 
-cos.period_length = torch.tensor(2*np.pi / f).float()
-rbf.lengthscale = torch.tensor([0.3, 0.5]).float()
-model.covar_module.outputscale = torch.tensor(np.var(y)).float()
+
+# cos.period_length = torch.tensor(2*np.pi / f).float() # For fixed lengthscales
+
+period = 2*np.pi / f
+cos.raw_period_length_constraint = Interval(period*0.9, period*1.1)
+startpoint_period = (period*0.9) + ((period*1.1)-(period*0.9)) * torch.rand_like(torch.tensor(period*0.9))
+model.covar_module.initialize(outputscale = torch.tensor(startpoint_period))
+
+
+# rbf.lengthscale = torch.tensor([0.41, 1.1]).float() # For fixed lengthscales 
+
+lower = torch.tensor([0.369, 0.99])
+upper = torch.tensor([0.44, 1.21])
+startpoint = lower + (upper - lower) * torch.rand_like(lower) 
+rbf.raw_lengthscale_constraint = Interval(lower, upper)
+rbf.initialize(lengthscale=torch.tensor(startpoint))
+
+
+# model.covar_module.outputscale = torch.tensor(np.var(y)).float()
+vary = np.var(y)
+model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
+startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
+model.covar_module.initialize(outputscale = torch.tensor(startpoint_var))
+
 model.mean_module.constant = torch.tensor(np.mean(y)).float()
 
+
+# Fix some hyperparameters 
+# cos.raw_period_length.requires_grad_(False)
+# rbf.raw_lengthscale.requires_grad_(False)
+# model.covar_module.raw_outputscale.requires_grad_(False)
 
 # Find optimal model hyperparameters
 model.train()
@@ -123,12 +151,11 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
 # Train the model
-training_iter = 300
+training_iter = 100
 
 model.train()
 likelihood.train()
 
-breakpoint()
 
 with gpytorch.settings.cholesky_jitter(1e-1): 
     for i in range(training_iter): 
@@ -156,6 +183,20 @@ with torch.no_grad(), gpytorch.settings.fast_pred_var():
 # Unsacle data 
 results_unscaled = observed_pred.mean*y_std+y_mean
 
+# Calculate error metrics 
+
+def MSE(ypred,ytest):
+    MSE = np.mean(((ypred-ytest)**2))
+    return MSE
+
+def nMSE(ypred,ytest):
+    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
+    return nMSE
+   
+error = MSE(results_unscaled.numpy(),y) 
+errorN = nMSE(results_unscaled.numpy(),y)
+
+print(errorN)
 
 # Plot results 
 prediction = go.Surface(
@@ -190,8 +231,10 @@ training = go.Scatter3d(
 )
 
 fig = go.Figure(data=[prediction, original, training])
-fig.update_layout(legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
+fig.update_layout(
+    title = f"NMSE = {errorN}",
+    legend=dict(
+        x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
 fig.show()
-    

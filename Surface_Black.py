@@ -177,6 +177,15 @@ fig.update_layout(legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         borderwidth=1))
 fig.show()
 
-MSE = (gpytorch.metrics.mean_squared_error(torch.from_numpy(results_unscaled),torch.from_numpy(y),squared=True))
-NMSE = 100* MSE * (y.std())**2
-print(f'NMSE: {NMSE:.3f}')
+def MSE(ypred,ytest):
+    MSE = np.mean(((ypred-ytest)**2))
+    return MSE
+
+def nMSE(ypred,ytest):
+    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
+    return nMSE
+   
+error = MSE(results_unscaled.numpy(),y) 
+errorN = nMSE(results_unscaled.numpy(),y)
+
+print(errorN)

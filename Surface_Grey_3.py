@@ -109,7 +109,7 @@ product = model.covar_module.base_kernel
 rbf = product.kernels[0]   
 cos = product.kernels[1] 
 
-# cos.period_length = torch.tensor(2*np.pi / f).float() # For fixed lengthscales
+# cos.period_length = torch.tensor(2*np.pi / f).float() # For fixed period
 
 period = 2*np.pi / f
 cos.raw_period_length_constraint = Interval(period*0.9, period*1.1)
@@ -126,7 +126,7 @@ rbf.raw_lengthscale_constraint = Interval(lower, upper)
 rbf.initialize(lengthscale=torch.tensor(startpoint))
 
 
-# model.covar_module.outputscale = torch.tensor(np.var(y)).float()
+# model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
 vary = np.var(y)
 model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
 startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))

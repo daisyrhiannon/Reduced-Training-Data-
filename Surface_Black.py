@@ -13,6 +13,8 @@ import gpytorch
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import copy
+from gpytorch.constraints import Interval
+from codecarbon import EmissionsTracker
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -21,6 +23,8 @@ import plotly.io as pio
 # Sort out plotting 
 pio.renderers.default = 'browser'
 
+tracker = EmissionsTracker()
+tracker.start()
 
 # Create data 
 x1o, x2o = np.meshgrid(np.arange(-1, 1, 0.02), np.arange(-1, 1, 0.02))
@@ -95,7 +99,27 @@ class ExactGPModel(gpytorch.models.ExactGP):
     
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
+likelihood.noise = torch.tensor(1e-4)
 model = ExactGPModel(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
+
+
+# Set hyperparameter bounds 
+# model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
+vary = np.var(y)
+model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
+startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
+model.covar_module.initialize(outputscale = torch.tensor(startpoint_var))
+
+# model.covar_module.base_kernel.lengthscale =0.72 # For fixed lengthscale 
+fixl = 0.72
+model.covar_module.base_kernel.raw_lengthscale_constraint = Interval(fixl*0.9, fixl*1.1)
+startpoint_ls = (fixl*0.9) + ((fixl*1.1)-(fixl*0.9)) * torch.rand_like(torch.tensor(fixl*0.9))
+model.covar_module.base_kernel.initialize(lengthscale = torch.tensor(startpoint_ls))
+
+
+# model.covar_module.raw_outputscale.requires_grad_(False)
+# model.covar_module.base_kernel.raw_lengthscale.requires_grad_(False)
+
 
 # Find optimal model hyperparameters
 model.train()
@@ -108,8 +132,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
 # Train the model
-training_iter = 300
-
+training_iter = 1000
 model.train()
 likelihood.train()
 
@@ -122,8 +145,7 @@ for i in range(training_iter):
     # Calc loss and backprop gradients 
     loss = -mll(output, y_train_scaled_tensor) 
     loss.backward() 
-    print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f' % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item())
-     )
+    print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Lengthscale: %.3f' % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), model.covar_module.base_kernel.lengthscale.item()))
     optimizer.step()
         
     
@@ -138,6 +160,19 @@ with torch.no_grad(), gpytorch.settings.fast_pred_var():
     
 # Unsacle data 
 results_unscaled = observed_pred.mean*y_std+y_mean
+
+def MSE(ypred,ytest):
+    MSE = np.mean(((ypred-ytest)**2))
+    return MSE
+
+def nMSE(ypred,ytest):
+    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
+    return nMSE
+   
+error = MSE(results_unscaled.numpy(),y) 
+errorN = nMSE(results_unscaled.numpy(),y)
+
+print(errorN)
 
 # Plot results 
 prediction = go.Surface(
@@ -172,20 +207,12 @@ training = go.Scatter3d(
 )
 
 fig = go.Figure(data=[prediction, original, training])
-fig.update_layout(legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
+fig.update_layout(
+    title = f"NMSE = {errorN}",
+    legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
 fig.show()
 
-def MSE(ypred,ytest):
-    MSE = np.mean(((ypred-ytest)**2))
-    return MSE
-
-def nMSE(ypred,ytest):
-    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
-    return nMSE
-   
-error = MSE(results_unscaled.numpy(),y) 
-errorN = nMSE(results_unscaled.numpy(),y)
-
-print(errorN)
+emissions = tracker.stop()
+print(f"Emissions: {emissions} kg CO₂eq")

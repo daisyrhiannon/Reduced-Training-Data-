@@ -15,6 +15,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import copy
 from gpytorch.constraints import Interval
 from codecarbon import EmissionsTracker
+import time
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -23,8 +24,8 @@ import plotly.io as pio
 # Sort out plotting 
 pio.renderers.default = 'browser'
 
-tracker = EmissionsTracker()
-tracker.start()
+# Start timer 
+start = time.perf_counter()
 
 # Create data 
 x1o, x2o = np.meshgrid(np.arange(-1, 1, 0.02), np.arange(-1, 1, 0.02))
@@ -214,5 +215,6 @@ fig.update_layout(
         borderwidth=1))
 fig.show()
 
-emissions = tracker.stop()
-print(f"Emissions: {emissions} kg CO₂eq")
+# Stop timer 
+end = time.perf_counter()
+print(f"Runtime: {end - start:.6f} seconds")

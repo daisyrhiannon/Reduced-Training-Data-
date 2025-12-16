@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 10 11:26:51 2025
+Created on Mon Dec 15 16:11:11 2025
 
 @author: mep24db
 """
+
 
 # Import necessary packages 
 import numpy as np
@@ -41,12 +42,23 @@ x = np.hstack([x1o_flat,x2o_flat])
 
 # Make training data 
 step=10
-x1_sub = x1o[::step, ::step]
-x2_sub = x2o[::step, ::step]
-y_sub = yo[::step, ::step]
+x1_sub = x1o[::step, ::step].ravel().reshape(-1,1)
+x2_sub = x2o[::step, ::step].ravel().reshape(-1,1)
+y_sub = yo[::step, ::step].ravel().reshape(-1,1)
 
-train_x = np.hstack([x1_sub.ravel().reshape(-1,1),x2_sub.ravel().reshape(-1,1)])
-train_y = y_sub.ravel() + 0.01*np.random.randn(y_sub.size)
+
+# pull from grid 
+Num_out = 36
+rng = np.random.default_rng(21)
+random_indices = rng.choice(100, 100, replace = False)
+indices_to_remove = random_indices[:Num_out]
+
+x1_sub_removed = np.delete(x1_sub, indices_to_remove, axis =0)
+x2_sub_removed = np.delete(x2_sub, indices_to_remove, axis = 0)
+y_sub_removed = np.delete(y_sub, indices_to_remove, axis = 0)
+
+train_x = np.hstack([x1_sub_removed, x2_sub_removed])
+train_y = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
 
 
 # Scale input data
@@ -198,7 +210,7 @@ def nMSE(ypred,ytest):
 error = MSE(results_unscaled.numpy(),y) 
 errorN = nMSE(results_unscaled.numpy(),y)
 
-print(errorN)
+print( f" NMSE = {errorN}" )
 
 # Plot results 
 prediction = go.Surface(

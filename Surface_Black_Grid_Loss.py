@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 10 11:26:51 2025
+Created on Mon Dec 15 16:07:48 2025
 
 @author: mep24db
 """
@@ -14,7 +14,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import copy
 from gpytorch.constraints import Interval
-import time 
+from codecarbon import EmissionsTracker
+import time
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -41,20 +42,32 @@ x = np.hstack([x1o_flat,x2o_flat])
 
 # Make training data 
 step=10
-x1_sub = x1o[::step, ::step]
-x2_sub = x2o[::step, ::step]
-y_sub = yo[::step, ::step]
+x1_sub = x1o[::step, ::step].ravel().reshape(-1,1)
+x2_sub = x2o[::step, ::step].ravel().reshape(-1,1)
+y_sub = yo[::step, ::step].ravel().reshape(-1,1)
 
-train_x = np.hstack([x1_sub.ravel().reshape(-1,1),x2_sub.ravel().reshape(-1,1)])
-train_y = y_sub.ravel() + 0.01*np.random.randn(y_sub.size)
+
+# pull from grid 
+Num_out = 49
+rng = np.random.default_rng(21)
+random_indices = rng.choice(100, 100, replace = False)
+indices_to_remove = random_indices[:Num_out]
+
+x1_sub_removed = np.delete(x1_sub, indices_to_remove, axis =0)
+x2_sub_removed = np.delete(x2_sub, indices_to_remove, axis = 0)
+y_sub_removed = np.delete(y_sub, indices_to_remove, axis = 0)
+
+x_train = np.hstack([x1_sub_removed, x2_sub_removed])
+y_train = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
 
 
 # Scale input data
-x_mean, x_std = train_x.mean(), train_x.std()
-x_train_scaled = (train_x - x_mean) / x_std
+x_mean = x_train.mean(axis = 0, keepdims=True)
+x_std = x_train.std(axis = 0, keepdims=True)
+x_train_scaled = (x_train - x_mean) / x_std
 
-y_mean, y_std = train_y.mean(), train_y.std()
-y_train_scaled = (train_y - y_mean) / y_std
+y_mean, y_std = y_train.mean(), y_train.std()
+y_train_scaled = (y_train - y_mean) / y_std
 
 x_test_scaled = (x - x_mean) / x_std
 
@@ -68,9 +81,9 @@ x_test_scaled = (x - x_mean) / x_std
 #     )
 
 # training_scaled = go.Scatter3d(
-#     x = x_train_scaled[:,0],
-#     y = x_train_scaled[:,1],
-#     z = y_train_scaled,
+#     x = x_train[:,0],
+#     y = x_train[:,1],
+#     z = y_train,
 #     mode = 'markers',
 #     )
 
@@ -87,11 +100,8 @@ x_test_scaled_tensor = torch.from_numpy(x_test_scaled).float()
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, x_train_scaled_tensor, y_train_scaled_tensor, likelihood):
         super(ExactGPModel, self).__init__(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
-        cos = gpytorch.kernels.CosineKernel()
-        rbf = gpytorch.kernels.RBFKernel(ard_num_dims=2)
-        product = rbf*cos
-        self.covar_module = gpytorch.kernels.ScaleKernel(product)
+        self.mean_module = gpytorch.means.ZeroMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
      
 
     def forward(self, x):
@@ -99,48 +109,29 @@ class ExactGPModel(gpytorch.models.ExactGP):
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
     
-
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
 likelihood.noise = torch.tensor(1e-4)
 model = ExactGPModel(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
 
 
-# set hyperparameters and bounds
-product = model.covar_module.base_kernel
-rbf = product.kernels[0]   
-cos = product.kernels[1] 
-
-# cos.period_length = torch.tensor(2*np.pi / f).float() # For fixed period
-
-period = 2*np.pi / f
-cos.raw_period_length_constraint = Interval(period*0.9, period*1.1)
-startpoint_period = (period*0.9) + ((period*1.1)-(period*0.9)) * torch.rand_like(torch.tensor(period*0.9))
-model.covar_module.initialize(outputscale = startpoint_period)
-
-
-# rbf.lengthscale = torch.tensor([0.41, 1.1]).float() # For fixed lengthscales 
-
-lower = torch.tensor([0.369, 0.99])
-upper = torch.tensor([0.44, 1.21])
-startpoint = lower + (upper - lower) * torch.rand_like(lower) 
-rbf.raw_lengthscale_constraint = Interval(lower, upper)
-rbf.initialize(lengthscale=startpoint)
-
-
+# Set hyperparameter bounds 
 # model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
 vary = np.var(y)
 model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
 startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
-model.covar_module.initialize(outputscale =startpoint_var)
+model.covar_module.initialize(outputscale = torch.tensor(startpoint_var))
 
-model.mean_module.constant = torch.tensor(np.mean(y)).float()
+# model.covar_module.base_kernel.lengthscale =0.72 # For fixed lengthscale 
+fixl = 0.72
+model.covar_module.base_kernel.raw_lengthscale_constraint = Interval(fixl*0.9, fixl*1.1)
+startpoint_ls = (fixl*0.9) + ((fixl*1.1)-(fixl*0.9)) * torch.rand_like(torch.tensor(fixl*0.9))
+model.covar_module.base_kernel.initialize(lengthscale = torch.tensor(startpoint_ls))
 
 
-# Fix some hyperparameters 
-# cos.raw_period_length.requires_grad_(False)
-# rbf.raw_lengthscale.requires_grad_(False)
 # model.covar_module.raw_outputscale.requires_grad_(False)
+# model.covar_module.base_kernel.raw_lengthscale.requires_grad_(False)
+
 
 # Find optimal model hyperparameters
 model.train()
@@ -154,38 +145,33 @@ mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
 # Train the model
 training_iter = 1000
-
 model.train()
 likelihood.train()
 
 
-with gpytorch.settings.cholesky_jitter(1e-1): 
-    for i in range(training_iter): 
-        # Zero gradients from previous iteration 
-        optimizer.zero_grad() 
-        # Output from model 
-        output = model(x_train_scaled_tensor) 
-        # Calc loss and backprop gradients 
-        loss = -mll(output, y_train_scaled_tensor) 
-        loss.backward() 
-        ls = rbf.lengthscale.detach().cpu().numpy()
-        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Cos Period: %.3f - Lengthscales: %s'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), cos.period_length.item(), np.array2string(ls, precision=3)))
-        optimizer.step()
-            
+for i in range(training_iter): 
+    # Zero gradients from previous iteration 
+    optimizer.zero_grad() 
+    # Output from model 
+    output = model(x_train_scaled_tensor) 
+    # Calc loss and backprop gradients 
+    loss = -mll(output, y_train_scaled_tensor) 
+    loss.backward() 
+    print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Lengthscale: %.3f' % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), model.covar_module.base_kernel.lengthscale.item()))
+    optimizer.step()
+        
     
 # Get into evaluation (predictive posterior) mode
 model.eval()
 likelihood.eval()
 
 with torch.no_grad(), gpytorch.settings.fast_pred_var():
-    trained_pred_dist = likelihood(model(x_test_scaled_tensor))
+    #trained_pred_dist = likelihood(model(x_train_scaled_tensor))
     observed_pred = likelihood(model(x_test_scaled_tensor))
-
+    
     
 # Unsacle data 
 results_unscaled = observed_pred.mean*y_std+y_mean
-
-# Calculate error metrics 
 
 def MSE(ypred,ytest):
     MSE = np.mean(((ypred-ytest)**2))
@@ -198,7 +184,7 @@ def nMSE(ypred,ytest):
 error = MSE(results_unscaled.numpy(),y) 
 errorN = nMSE(results_unscaled.numpy(),y)
 
-print(errorN)
+print( f" NMSE = {errorN}" )
 
 # Plot results 
 prediction = go.Surface(
@@ -224,9 +210,9 @@ original = go.Surface(
 )
 
 training = go.Scatter3d(
-    x=train_x[:,0],
-    y=train_x[:,1], 
-    z=train_y, 
+    x=x_train[:,0],
+    y=x_train[:,1], 
+    z=y_train, 
     mode='markers', 
     marker=dict(size=5, color='black', symbol='circle'),
     name='Training Data'
@@ -235,8 +221,7 @@ training = go.Scatter3d(
 fig = go.Figure(data=[prediction, original, training])
 fig.update_layout(
     title = f"NMSE = {errorN}",
-    legend=dict(
-        x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
+    legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
 fig.show()

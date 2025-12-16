@@ -8,8 +8,7 @@ Created on Fri Dec 12 13:43:14 2025
 from codecarbon import EmissionsTracker
 
 tracker = EmissionsTracker(
-    tracking_mode="process", 
-    force_cpu_power=True,)
+    gpu_ids=[0])
 tracker.start()
 
 # --- Your code here ---

@@ -48,8 +48,8 @@ y_sub = yo[::step, ::step].ravel().reshape(-1,1)
 
 
 # pull from grid 
-Num_out = 36
-rng = np.random.default_rng(21)
+Num_out = 0
+rng = np.random.default_rng(273)
 random_indices = rng.choice(100, 100, replace = False)
 indices_to_remove = random_indices[:Num_out]
 

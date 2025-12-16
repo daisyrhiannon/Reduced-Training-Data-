@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec 12 13:43:14 2025
+Created on Tue Dec 16 15:56:25 2025
 
 @author: mep24db
 """
-
 
 # Import necessary packages 
 import numpy as np
@@ -39,24 +38,13 @@ x = np.hstack([x1o_flat,x2o_flat])
 
 
 # Make training data 
-step=10
-x1_sub = x1o[::step, ::step].ravel().reshape(-1,1)
-x2_sub = x2o[::step, ::step].ravel().reshape(-1,1)
-y_sub = yo[::step, ::step].ravel().reshape(-1,1)
+x1_strip = x1o_flat[99::100]
+x2_strip = x2o_flat[99::100]
+y_strip = y[99::100]
 
 
-# pull from grid 
-Num_out = 40 
-rng = np.random.default_rng(67)
-random_indices = rng.choice(100, 100, replace = False)
-indices_to_remove = random_indices[:Num_out]
-
-x1_sub_removed = np.delete(x1_sub, indices_to_remove, axis =0)
-x2_sub_removed = np.delete(x2_sub, indices_to_remove, axis = 0)
-y_sub_removed = np.delete(y_sub, indices_to_remove, axis = 0)
-
-train_x = np.hstack([x1_sub_removed, x2_sub_removed])
-train_y = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
+# train_x = np.hstack([x1_sub_removed, x2_sub_removed])
+# train_y = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
 
 
 
@@ -69,11 +57,11 @@ original = go.Surface(
     )
 
 training = go.Scatter3d(
-    x = train_x[:,0],
-    y = train_x[:,1],
-    z = train_y,
+    x = x1_strip.ravel(),
+    y = x2_strip.ravel(),
+    z = y_strip.ravel(),
     mode = 'markers',
     )
 
-fig = go.Figure(data=[training])
+fig = go.Figure(data=[original, training])
 fig.show()

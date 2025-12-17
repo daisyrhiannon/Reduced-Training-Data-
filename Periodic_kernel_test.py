@@ -131,38 +131,43 @@ product = model.covar_module.base_kernel
 rbf = product.kernels[0]   
 period = product.kernels[1] 
 
-period.period_length = torch.tensor(2 * np.pi / f).float() # For fixed period
-period.lengthscale = torch.tensor(3).float()
+# period.period_length = torch.tensor(2 * np.pi / f).float() # For fixed period
 
-# period = 2*np.pi / f
-# cos.raw_period_length_constraint = Interval(period*0.9, period*1.1)
-# startpoint_period = (period*0.9) + ((period*1.1)-(period*0.9)) * torch.rand_like(torch.tensor(period*0.9))
-# model.covar_module.initialize(outputscale = startpoint_period)
-
-
-rbf.lengthscale = torch.tensor(1).float() # For fixed lengthscales 
-
-# lower = torch.tensor([0.369, 0.99])
-# upper = torch.tensor([0.44, 1.21])
-# startpoint = lower + (upper - lower) * torch.rand_like(lower) 
-# rbf.raw_lengthscale_constraint = Interval(lower, upper)
-# rbf.initialize(lengthscale=startpoint)
+real_period = 2*np.pi / f
+period.raw_period_length_constraint = Interval(real_period*0.9, real_period*1.1)
+startpoint_period = (real_period*0.9) + ((real_period*1.1)-(real_period*0.9)) * torch.rand_like(torch.tensor(real_period*0.9))
+model.covar_module.initialize(outputscale = startpoint_period)
 
 
-model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
-# vary = np.var(y)
-# model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
-# startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
-# model.covar_module.initialize(outputscale =startpoint_var)
 
-# model.mean_module.constant = torch.tensor(np.mean(y)).float()
+# period.lengthscale = torch.tensor(1).float() # for fixed lengthscales 
+lower2 = torch.tensor(1)
+upper2 = torch.tensor(3)
+startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
+period.initialize(lengthscale=startpoint2)
+
+# rbf.lengthscale = torch.tensor(1).float() # For fixed lengthscales 
+lower = torch.tensor(0)
+upper = torch.tensor(1)
+startpoint = torch.rand(1)
+rbf.raw_lengthscale_constraint = Interval(lower, upper)
+rbf.initialize(lengthscale=startpoint)
+
+
+# model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
+vary = np.var(y)
+model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
+startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
+model.covar_module.initialize(outputscale =startpoint_var)
+
+model.mean_module.constant = torch.tensor(np.mean(y)).float()
 
 
 # Fix some hyperparameters 
-period.raw_period_length.requires_grad_(False)
-period.raw_lengthscale.requires_grad_(False)
-rbf.raw_lengthscale.requires_grad_(False)
-model.covar_module.raw_outputscale.requires_grad_(False)
+# period.raw_period_length.requires_grad_(False)
+# period.raw_lengthscale.requires_grad_(False)
+# rbf.raw_lengthscale.requires_grad_(False)
+# model.covar_module.raw_outputscale.requires_grad_(False)
 
 # Find optimal model hyperparameters
 model.train()
@@ -175,7 +180,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
 # Train the model
-training_iter = 1
+training_iter = 300
 
 model.train()
 likelihood.train()
@@ -191,7 +196,7 @@ with gpytorch.settings.cholesky_jitter(1e-1):
         loss = -mll(output, y_train) 
         loss.backward() 
         ls = rbf.lengthscale.detach().cpu().numpy()
-        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Cos Period: %.3f - Lengthscales: %s'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), period.period_length.item(), np.array2string(ls, precision=3)))
+        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Period: %.3f  - Period Lengthscale: %3f - RBF Lengthscale: %3f'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), period.period_length.item(), period.lengthscale.item(), rbf.lengthscale.item()))
         optimizer.step()
             
     

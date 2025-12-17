@@ -37,14 +37,23 @@ y = yo.ravel()
 x = np.hstack([x1o_flat,x2o_flat])
 
 
-# Make training data 
-x1_strip = x1o_flat[99::100]
-x2_strip = x2o_flat[99::100]
-y_strip = y[99::100]
+# # Make training data 
+x1_strip = x1o[:,90:100].ravel().reshape(-1,1)
+x2_strip = x2o[:,90:100].ravel().reshape(-1,1)
+y_strip = yo[:,90:100].ravel().reshape(-1,1)
+
+n_train = 10
+rng = np.random.default_rng(12)
+random_indices = rng.choice(1000, n_train, replace = False)
+
+x1_train = x1_strip[random_indices]
+x2_train = x2_strip[random_indices]
+y_train = y_strip[random_indices]
 
 
-# train_x = np.hstack([x1_sub_removed, x2_sub_removed])
-# train_y = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
+ 
+train_x = np.hstack([x1_train, x2_train])
+train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)
 
 
 
@@ -57,9 +66,9 @@ original = go.Surface(
     )
 
 training = go.Scatter3d(
-    x = x1_strip.ravel(),
-    y = x2_strip.ravel(),
-    z = y_strip.ravel(),
+    x = train_x[:,0].ravel(),
+    y = train_x[:,1].ravel(),
+    z = train_y.ravel(),
     mode = 'markers',
     )
 

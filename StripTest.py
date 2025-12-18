@@ -38,19 +38,21 @@ x = np.hstack([x1o_flat,x2o_flat])
 
 
 # # Make training data 
-x1_strip = x1o[:,90:100].ravel().reshape(-1,1)
-x2_strip = x2o[:,90:100].ravel().reshape(-1,1)
-y_strip = yo[:,90:100].ravel().reshape(-1,1)
+x1_strip = x1o[:,70:100]
+x2_strip = x2o[:,70:100]
+y_strip = yo[:,70:100]
 
-n_train = 10
-rng = np.random.default_rng(12)
-random_indices = rng.choice(1000, n_train, replace = False)
+# n_train = 1000
+# rng = np.random.default_rng(12)
+# random_indices = rng.choice(3000, n_train, replace = False)
 
-x1_train = x1_strip[random_indices]
-x2_train = x2_strip[random_indices]
-y_train = y_strip[random_indices]
+# x1_train = x1_strip[random_indices]
+# x2_train = x2_strip[random_indices]
+# y_train = y_strip[random_indices]
 
-
+x1_train = x1_strip[::10].ravel()[::10].reshape(-1,1) # first slice controls how many rows parallel to x, second is how many rows parallel to y 
+x2_train = x2_strip[::10].ravel()[::10].reshape(-1,1)
+y_train = y_strip [::10].ravel()[::10].reshape(-1,1)
  
 train_x = np.hstack([x1_train, x2_train])
 train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)

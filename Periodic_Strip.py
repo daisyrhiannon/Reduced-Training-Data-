@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 17 16:36:58 2025
+Created on Thu Dec 18 10:19:00 2025
 
 @author: mep24db
 """
+
 
 
 # Import necessary packages 
@@ -41,23 +42,33 @@ x = np.hstack([x1o_flat,x2o_flat])
 
 
 # # Make training data 
-x1_strip = x1o[:,75:100].ravel().reshape(-1,1)
-x2_strip = x2o[:,75:100].ravel().reshape(-1,1)
-y_strip = yo[:,75:100].ravel().reshape(-1,1)
+# # For random data within the strip 
+x1_strip = x1o[:,50:100].ravel().reshape(-1,1)
+x2_strip = x2o[:,50:100].ravel().reshape(-1,1)
+y_strip = yo[:,50:100].ravel().reshape(-1,1)
 
-n_train = 20
+# For random data within the strip 
+n_train = 100
 rng = np.random.default_rng(12)
-random_indices = rng.choice(2500, n_train, replace = False)
+random_indices = rng.choice(5000, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
 x2_train = x2_strip[random_indices]
 y_train = y_strip[random_indices]
 
 
+# # Make training data
+# # For organised grid within the strip 
+# x1_strip = x1o[:,50:100]
+# x2_strip = x2o[:,50:100]
+# y_strip = yo[:,50:100]
+
+# x1_train = x1_strip[::9].ravel()[::5].reshape(-1,1) # first slice controls how many rows parallel to x, second is how many rows parallel to y 
+# x2_train = x2_strip[::9].ravel()[::5].reshape(-1,1)
+# y_train = y_strip [::9].ravel()[::5].reshape(-1,1)
  
 train_x = np.hstack([x1_train, x2_train])
 train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)
-
 
 # Scale input data
 # x_mean, x_std = train_x.mean(), train_x.std()
@@ -125,12 +136,12 @@ product = model.covar_module.base_kernel
 rbf = product.kernels[0]   
 period = product.kernels[1] 
 
-period.period_length = torch.tensor(2 * np.pi / f).float() # For fixed period
+# period.period_length = torch.tensor(2 * np.pi / f).float() # For fixed period
 
-# real_period = 2*np.pi / f
-# period.raw_period_length_constraint = Interval(real_period*0.9, real_period*1.1)
-# startpoint_period = (real_period*0.9) + ((real_period*1.1)-(real_period*0.9)) * torch.rand_like(torch.tensor(real_period*0.9))
-# model.covar_module.initialize(outputscale = startpoint_period)
+real_period = 2*np.pi / f
+period.raw_period_length_constraint = Interval(real_period*0.9, real_period*1.1)
+startpoint_period = (real_period*0.9) + ((real_period*1.1)-(real_period*0.9)) * torch.rand_like(torch.tensor(real_period*0.9))
+model.covar_module.initialize(outputscale = startpoint_period)
 
 
 
@@ -158,7 +169,7 @@ model.mean_module.constant = torch.tensor(np.mean(y)).float()
 
 
 # Fix some hyperparameters 
-period.raw_period_length.requires_grad_(False)
+# period.raw_period_length.requires_grad_(False)
 # period.raw_lengthscale.requires_grad_(False)
 # rbf.raw_lengthscale.requires_grad_(False)
 # model.covar_module.raw_outputscale.requires_grad_(False)

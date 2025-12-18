@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import copy
 from gpytorch.constraints import Interval
-from codecarbon import EmissionsTracker
 import time
 
 import plotly.graph_objects as go

@@ -48,7 +48,7 @@ y_sub = yo[::step, ::step].ravel().reshape(-1,1)
 
 
 # pull from grid 
-Num_out = 73
+Num_out = 20
 rng = np.random.default_rng(273)
 random_indices = rng.choice(100, 100, replace = False)
 indices_to_remove = random_indices[:Num_out]
@@ -141,10 +141,10 @@ upper2 = torch.tensor(3)
 startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
 period.initialize(lengthscale=startpoint2)
 
-# rbf.lengthscale = torch.tensor(1).float() # For fixed lengthscales 
-lower = torch.tensor(0)
+# rbf.lengthscale = torch.tensor(0.2).float() # For fixed lengthscales 
+lower = torch.tensor(0.1)
 upper = torch.tensor(1)
-startpoint = torch.rand(1)
+startpoint = lower+(upper-lower)*torch.rand(1)
 rbf.raw_lengthscale_constraint = Interval(lower, upper)
 rbf.initialize(lengthscale=startpoint)
 
@@ -264,7 +264,7 @@ fig.update_layout(
         x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
-fig.show()
+# fig.show()
 
 # Stop timer 
 end = time.perf_counter()

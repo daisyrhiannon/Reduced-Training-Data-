@@ -34,25 +34,27 @@ yo = np.sqrt(np.abs(x2o)) * np.sin(f * x1o)
 x1o_flat = x1o.ravel().reshape(-1,1)
 x2o_flat = x2o.ravel().reshape(-1,1)
 y = yo.ravel()
-x = np.hstack([x1o_flat,x2o_flat])
+x = np.hstack([x1o_flat, x2o_flat])
 
 
 # # Make training data 
-x1_strip = x1o[:,70:100]
-x2_strip = x2o[:,70:100]
-y_strip = yo[:,70:100]
+# # For random data within the strip 
 
-# n_train = 1000
-# rng = np.random.default_rng(12)
-# random_indices = rng.choice(3000, n_train, replace = False)
+strip_width = 30
+x1_strip = x1o[:, 100-strip_width:100].reshape(-1, 1)
+x2_strip = x2o[:, 100-strip_width:100].reshape(-1, 1)
+y_strip  = yo[:,  100-strip_width:100].reshape(-1, 1)
 
-# x1_train = x1_strip[random_indices]
-# x2_train = x2_strip[random_indices]
-# y_train = y_strip[random_indices]
 
-x1_train = x1_strip[::10].ravel()[::10].reshape(-1,1) # first slice controls how many rows parallel to x, second is how many rows parallel to y 
-x2_train = x2_strip[::10].ravel()[::10].reshape(-1,1)
-y_train = y_strip [::10].ravel()[::10].reshape(-1,1)
+# For random data within the strip 
+n_train = strip_width*10
+rng = np.random.default_rng(12)
+random_indices = rng.choice(strip_width*100, n_train, replace = False)
+
+x1_train = x1_strip[random_indices]
+x2_train = x2_strip[random_indices]
+y_train = y_strip[random_indices]
+
  
 train_x = np.hstack([x1_train, x2_train])
 train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)

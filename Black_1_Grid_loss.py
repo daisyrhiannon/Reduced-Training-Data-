@@ -5,6 +5,10 @@ Created on Thu Dec 18 14:53:48 2025
 @author: mep24db
 """
 
+# Tell it not to use GPU 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 
 # Import necessary packages 
 import numpy as np
@@ -49,8 +53,8 @@ y_sub = yo[::step, ::step].ravel().reshape(-1,1)
 
 
 # pull from grid 
-Num_out = 55
-rng = np.random.default_rng(21)
+Num_out = 69
+rng = np.random.default_rng(273)
 random_indices = rng.choice(100, 100, replace = False)
 indices_to_remove = random_indices[:Num_out]
 

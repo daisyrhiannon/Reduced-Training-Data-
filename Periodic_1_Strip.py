@@ -6,6 +6,10 @@ Created on Thu Dec 18 10:19:00 2025
 """
 
 
+# Tell it not to use GPU 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 
 # Import necessary packages 
 import numpy as np
@@ -40,32 +44,23 @@ x2o_flat = x2o.ravel().reshape(-1,1)
 y = yo.ravel()+0.01*np.random.randn(x1o_flat.size)
 x = np.hstack([x1o_flat,x2o_flat])
 
-
 # # Make training data 
 # # For random data within the strip 
-x1_strip = x1o[:,50:100].ravel().reshape(-1,1)
-x2_strip = x2o[:,50:100].ravel().reshape(-1,1)
-y_strip = yo[:,50:100].ravel().reshape(-1,1)
+
+strip_width = 40
+x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
 # For random data within the strip 
-n_train = 100
-rng = np.random.default_rng(12)
-random_indices = rng.choice(5000, n_train, replace = False)
+n_train = strip_width*10
+rng = np.random.default_rng(222)
+random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
 x2_train = x2_strip[random_indices]
 y_train = y_strip[random_indices]
 
-
-# # Make training data
-# # For organised grid within the strip 
-# x1_strip = x1o[:,50:100]
-# x2_strip = x2o[:,50:100]
-# y_strip = yo[:,50:100]
-
-# x1_train = x1_strip[::9].ravel()[::5].reshape(-1,1) # first slice controls how many rows parallel to x, second is how many rows parallel to y 
-# x2_train = x2_strip[::9].ravel()[::5].reshape(-1,1)
-# y_train = y_strip [::9].ravel()[::5].reshape(-1,1)
  
 train_x = np.hstack([x1_train, x2_train])
 train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)
@@ -151,13 +146,12 @@ upper2 = torch.tensor(3)
 startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
 period.initialize(lengthscale=startpoint2)
 
-# rbf.lengthscale = torch.tensor(1).float() # For fixed lengthscales 
-lower = torch.tensor(0)
+# rbf.lengthscale = torch.tensor(0.2).float() # For fixed lengthscales 
+lower = torch.tensor(0.1)
 upper = torch.tensor(1)
-startpoint = torch.rand(1)
+startpoint = lower+(upper-lower)*torch.rand(1)
 rbf.raw_lengthscale_constraint = Interval(lower, upper)
 rbf.initialize(lengthscale=startpoint)
-
 
 # model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
 vary = np.var(y)
@@ -185,7 +179,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
 # Train the model
-training_iter = 300
+training_iter = 1000
 
 model.train()
 likelihood.train()
@@ -274,7 +268,7 @@ fig.update_layout(
         x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
-fig.show()
+# fig.show()
 
 # Stop timer 
 end = time.perf_counter()

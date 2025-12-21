@@ -5,6 +5,10 @@ Created on Wed Dec 17 11:34:58 2025
 @author: mep24db
 """
 
+# Tell it not to use GPU 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 
 # Import necessary packages 
 import numpy as np
@@ -42,34 +46,37 @@ x = np.hstack([x1o_flat,x2o_flat])
 
 
 # # Make training data 
-x1_strip = x1o[:,90:100].ravel().reshape(-1,1)
-x2_strip = x2o[:,90:100].ravel().reshape(-1,1)
-y_strip = yo[:,90:100].ravel().reshape(-1,1)
+# # For random data within the strip 
 
-n_train = 10
-rng = np.random.default_rng(12)
-random_indices = rng.choice(1000, n_train, replace = False)
+strip_width = 60
+x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
+
+# For random data within the strip 
+n_train = strip_width*10
+rng = np.random.default_rng(222)
+random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
 x2_train = x2_strip[random_indices]
-y_train_sub = y_strip[random_indices]
-
+y_train = y_strip[random_indices]
 
  
 x_train = np.hstack([x1_train, x2_train])
-y_train = y_train_sub.ravel() + 0.01*np.random.randn(y_train_sub.size)
+y_train = y_train.ravel() + 0.01*np.random.randn(y_train.size)
 
 
 
-# Scale input data
-x_mean = x_train.mean(axis = 0, keepdims=True)
-x_std = x_train.std(axis = 0, keepdims=True)
-x_train_scaled = (x_train - x_mean) / x_std
+# # Scale input data
+# x_mean = x_train.mean(axis = 0, keepdims=True)
+# x_std = x_train.std(axis = 0, keepdims=True)
+# x_train_scaled = (x_train - x_mean) / x_std
 
-y_mean, y_std = y_train.mean(), y_train.std()
-y_train_scaled = (y_train - y_mean) / y_std
+# y_mean, y_std = y_train.mean(), y_train.std()
+# y_train_scaled = (y_train - y_mean) / y_std
 
-x_test_scaled = (x - x_mean) / x_std
+# x_test_scaled = (x - x_mean) / x_std
 
 
 # # Visualise to check 
@@ -91,9 +98,9 @@ x_test_scaled = (x - x_mean) / x_std
 # fig.show()
 
 # Make tensors 
-x_train_scaled_tensor = torch.from_numpy(x_train_scaled).float()
-y_train_scaled_tensor = torch.from_numpy(y_train_scaled).float()
-x_test_scaled_tensor = torch.from_numpy(x_test_scaled).float()
+x_train_scaled_tensor = torch.from_numpy(x_train).float()
+y_train_scaled_tensor = torch.from_numpy(y_train).float()
+x_test_scaled_tensor = torch.from_numpy(x).float()
 
 
 # Define model 
@@ -111,22 +118,22 @@ class ExactGPModel(gpytorch.models.ExactGP):
     
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
-likelihood.noise = torch.tensor(1e-4)
+# likelihood.noise = torch.tensor(1e-4)
 model = ExactGPModel(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
 
 
-# Set hyperparameter bounds 
-# model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
-vary = np.var(y)
-model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
-startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
-model.covar_module.initialize(outputscale = torch.tensor(startpoint_var))
+# # Set hyperparameter bounds 
+# # model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
+# vary = np.var(y)
+# model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
+# startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
+# model.covar_module.initialize(outputscale = torch.tensor(startpoint_var))
 
-# model.covar_module.base_kernel.lengthscale =0.72 # For fixed lengthscale 
-fixl = 0.72
-model.covar_module.base_kernel.raw_lengthscale_constraint = Interval(fixl*0.9, fixl*1.1)
-startpoint_ls = (fixl*0.9) + ((fixl*1.1)-(fixl*0.9)) * torch.rand_like(torch.tensor(fixl*0.9))
-model.covar_module.base_kernel.initialize(lengthscale = torch.tensor(startpoint_ls))
+# # model.covar_module.base_kernel.lengthscale =0.72 # For fixed lengthscale 
+# fixl = 0.72
+# model.covar_module.base_kernel.raw_lengthscale_constraint = Interval(fixl*0.9, fixl*1.1)
+# startpoint_ls = (fixl*0.9) + ((fixl*1.1)-(fixl*0.9)) * torch.rand_like(torch.tensor(fixl*0.9))
+# model.covar_module.base_kernel.initialize(lengthscale = torch.tensor(startpoint_ls))
 
 
 # model.covar_module.raw_outputscale.requires_grad_(False)
@@ -170,8 +177,8 @@ with torch.no_grad(), gpytorch.settings.fast_pred_var():
     observed_pred = likelihood(model(x_test_scaled_tensor))
     
     
-# Unsacle data 
-results_unscaled = observed_pred.mean*y_std+y_mean
+# # Unsacle data 
+# results_unscaled = observed_pred.mean*y_std+y_mean
 
 def MSE(ypred,ytest):
     MSE = np.mean(((ypred-ytest)**2))
@@ -181,14 +188,14 @@ def nMSE(ypred,ytest):
     nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
     return nMSE
    
-error = MSE(results_unscaled.numpy(),y) 
-errorN = nMSE(results_unscaled.numpy(),y)
+error = MSE(observed_pred.mean.numpy(),y) 
+errorN = nMSE(observed_pred.mean.numpy(),y)
 
 print(errorN)
 
 # Plot results 
 prediction = go.Surface(
-    z=results_unscaled.numpy().reshape(x1o.shape),
+    z=observed_pred.mean.numpy().reshape(x1o.shape),
     x=x1o, 
     y=x2o, 
     colorscale="jet", 
@@ -224,7 +231,7 @@ fig.update_layout(
     legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
-fig.show()
+# fig.show()
 
 # Stop timer 
 end = time.perf_counter()

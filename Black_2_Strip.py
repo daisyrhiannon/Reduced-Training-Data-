@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Dec 15 16:07:48 2025
+Created on Fri Dec 19 13:22:57 2025
 
 @author: mep24db
 """
+
+
 # Tell it not to use GPU 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -44,25 +46,27 @@ y = yo.ravel()
 x = np.hstack([x1o_flat,x2o_flat])
 
 
-# Make training data 
-step=10
-x1_sub = x1o[::step, ::step].ravel().reshape(-1,1)
-x2_sub = x2o[::step, ::step].ravel().reshape(-1,1)
-y_sub = yo[::step, ::step].ravel().reshape(-1,1)
+# # Make training data 
+# # For random data within the strip 
 
+strip_width = 60
+x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
-# pull from grid 
-Num_out = 81
-rng = np.random.default_rng(273)
-random_indices = rng.choice(100, 100, replace = False)
-indices_to_remove = random_indices[:Num_out]
+# For random data within the strip 
+n_train = strip_width*10
+rng = np.random.default_rng(222)
+random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
-x1_sub_removed = np.delete(x1_sub, indices_to_remove, axis =0)
-x2_sub_removed = np.delete(x2_sub, indices_to_remove, axis = 0)
-y_sub_removed = np.delete(y_sub, indices_to_remove, axis = 0)
+x1_train = x1_strip[random_indices]
+x2_train = x2_strip[random_indices]
+y_train = y_strip[random_indices]
 
-x_train = np.hstack([x1_sub_removed, x2_sub_removed])
-y_train = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
+ 
+x_train = np.hstack([x1_train, x2_train])
+y_train = y_train.ravel() + 0.01*np.random.randn(y_train.size)
+
 
 
 # # Scale input data
@@ -95,9 +99,9 @@ y_train = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
 # fig.show()
 
 # Make tensors 
-x_train_tensor = torch.from_numpy(x_train).float()
-y_train_tensor = torch.from_numpy(y_train).float()
-x_test_tensor = torch.from_numpy(x).float()
+x_train_scaled_tensor = torch.from_numpy(x_train).float()
+y_train_scaled_tensor = torch.from_numpy(y_train).float()
+x_test_scaled_tensor = torch.from_numpy(x).float()
 
 
 # Define model 
@@ -116,7 +120,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
 likelihood.noise = torch.tensor(1e-4)
-model = ExactGPModel(x_train_tensor, y_train_tensor, likelihood)
+model = ExactGPModel(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
 
 
 # Set hyperparameter bounds 
@@ -157,9 +161,9 @@ for i in range(training_iter):
     # Zero gradients from previous iteration 
     optimizer.zero_grad() 
     # Output from model 
-    output = model(x_train_tensor) 
+    output = model(x_train_scaled_tensor) 
     # Calc loss and backprop gradients 
-    loss = -mll(output, y_train_tensor) 
+    loss = -mll(output, y_train_scaled_tensor) 
     loss.backward() 
     print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Lengthscale: %.3f' % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), model.covar_module.base_kernel.lengthscale.item()))
     optimizer.step()
@@ -171,7 +175,7 @@ likelihood.eval()
 
 with torch.no_grad(), gpytorch.settings.fast_pred_var():
     #trained_pred_dist = likelihood(model(x_train_scaled_tensor))
-    observed_pred = likelihood(model(x_test_tensor))
+    observed_pred = likelihood(model(x_test_scaled_tensor))
     
     
 # # Unsacle data 
@@ -188,7 +192,7 @@ def nMSE(ypred,ytest):
 error = MSE(observed_pred.mean.numpy(),y) 
 errorN = nMSE(observed_pred.mean.numpy(),y)
 
-print( f" NMSE = {errorN}" )
+print(errorN)
 
 # Plot results 
 prediction = go.Surface(

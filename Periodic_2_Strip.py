@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Dec 18 16:21:25 2025
+Created on Fri Dec 19 13:25:25 2025
 
 @author: mep24db
 """
+
+
 # Tell it not to use GPU 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
-
 
 
 # Import necessary packages 
@@ -45,25 +45,40 @@ y = yo.ravel()+0.01*np.random.randn(x1o_flat.size)
 x = np.hstack([x1o_flat,x2o_flat])
 
 
-# Make training data 
-step=10
-x1_sub = x1o[::step, ::step].ravel().reshape(-1,1)
-x2_sub = x2o[::step, ::step].ravel().reshape(-1,1)
-y_sub = yo[::step, ::step].ravel().reshape(-1,1)
+# # Make training data 
+# # For random data within the strip 
+
+strip_width = 20
+x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
+y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
+
+# For random data within the strip 
+n_train = strip_width*10
+rng = np.random.default_rng(12)
+random_indices = rng.choice(strip_width*100, n_train, replace = False)
+
+x1_train = x1_strip[random_indices]
+x2_train = x2_strip[random_indices]
+y_train = y_strip[random_indices]
+
+ 
+train_x = np.hstack([x1_train, x2_train])
+train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)
 
 
-# pull from grid 
-Num_out = 69
-rng = np.random.default_rng(273)
-random_indices = rng.choice(100, 100, replace = False)
-indices_to_remove = random_indices[:Num_out]
+# # Make training data
+# # For organised grid within the strip 
+# x1_strip = x1o[:,50:100]
+# x2_strip = x2o[:,50:100]
+# y_strip = yo[:,50:100]
 
-x1_sub_removed = np.delete(x1_sub, indices_to_remove, axis =0)
-x2_sub_removed = np.delete(x2_sub, indices_to_remove, axis = 0)
-y_sub_removed = np.delete(y_sub, indices_to_remove, axis = 0)
-
-train_x = np.hstack([x1_sub_removed, x2_sub_removed])
-train_y = y_sub_removed.ravel() + 0.01*np.random.randn(y_sub_removed.size)
+# x1_train = x1_strip[::9].ravel()[::5].reshape(-1,1) # first slice controls how many rows parallel to x, second is how many rows parallel to y 
+# x2_train = x2_strip[::9].ravel()[::5].reshape(-1,1)
+# y_train = y_strip [::9].ravel()[::5].reshape(-1,1)
+ 
+train_x = np.hstack([x1_train, x2_train])
+train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)
 
 # Scale input data
 # x_mean, x_std = train_x.mean(), train_x.std()

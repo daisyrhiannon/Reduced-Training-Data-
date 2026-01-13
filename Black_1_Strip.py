@@ -48,7 +48,7 @@ x = np.hstack([x1o_flat,x2o_flat])
 # # Make training data 
 # # For random data within the strip 
 
-strip_width = 60
+strip_width = 20
 x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
@@ -79,23 +79,41 @@ y_train = y_train.ravel() + 0.01*np.random.randn(y_train.size)
 # x_test_scaled = (x - x_mean) / x_std
 
 
-# # Visualise to check 
-# original = go.Surface(
-#     x = x1o, 
-#     y = x2o, 
-#     z = yo,
-#     colorscale = 'greys'
-#     )
+# Visualise to check 
+original = go.Surface(
+    x = x1o, 
+    y = x2o, 
+    z = yo,
+    colorscale = 'greys', 
+    opacity = 0.9
+    )
 
-# training_scaled = go.Scatter3d(
-#     x = x_train[:,0],
-#     y = x_train[:,1],
-#     z = y_train,
-#     mode = 'markers',
-#     )
+training_scaled = go.Scatter3d(
+    x = x_train[:,0],
+    y = x_train[:,1],
+    z = y_train,
+    mode = 'markers',
+    )
 
-# fig = go.Figure(data=[original,training_scaled])
-# fig.show()
+fig = go.Figure(data=[original])
+fig.update_layout(
+    scene=dict(
+        xaxis_title="x1",
+        yaxis_title="x2",
+        zaxis_title="y",
+        xaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+        yaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+        zaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+        camera=dict(
+            eye=dict(x=1.25, y=1.25, z=1.25),
+            center=dict(x=0, y=0.2, z=0),
+            up=dict(x=0, y=0, z=1)), 
+        
+    )
+)
+
+
+fig.show()
 
 # Make tensors 
 x_train_scaled_tensor = torch.from_numpy(x_train).float()
@@ -107,7 +125,7 @@ x_test_scaled_tensor = torch.from_numpy(x).float()
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, x_train_scaled_tensor, y_train_scaled_tensor, likelihood):
         super(ExactGPModel, self).__init__(x_train_scaled_tensor, y_train_scaled_tensor, likelihood)
-        self.mean_module = gpytorch.means.ZeroMean()
+        self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
      
 
@@ -202,7 +220,7 @@ prediction = go.Surface(
     name='Prediction',
     opacity=0.9,
     showscale=False,
-    showlegend=True
+    showlegend=False
 )
 
 original = go.Surface(
@@ -210,10 +228,10 @@ original = go.Surface(
     x=x1o, 
     y=x2o, 
     colorscale='greys', 
-    name='Original', 
+    name='Target', 
     opacity=0.7,
     showscale=False,
-    showlegend=True
+    showlegend=False
 )
 
 training = go.Scatter3d(
@@ -222,16 +240,37 @@ training = go.Scatter3d(
     z=y_train, 
     mode='markers', 
     marker=dict(size=5, color='black', symbol='circle'),
-    name='Training Data'
+    name='Training Data', 
+    showlegend=False
 )
 
 fig = go.Figure(data=[prediction, original, training])
 fig.update_layout(
-    title = f"NMSE = {errorN}",
-    legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
-        bordercolor='black',
-        borderwidth=1))
-# fig.show()
+    # title = f"NMSE = {errorN}",
+    # legend=dict(x=0.45, y=0.01, bgcolor='rgba(255,255,255,0.7)',
+    #     orientation="h",
+    #     bordercolor='black',
+    #     borderwidth=1,
+    #     xanchor="center",
+    #     yanchor="top",
+    #     font=dict(size=40),
+    #     itemsizing="constant"
+    #     ),
+    scene=dict(
+        xaxis_title="x1",
+        yaxis_title="x2",
+        zaxis_title="y",  
+        camera=dict(
+            eye=dict(x=1.25, y=1.25, z=1.25),
+            center=dict(x=0, y=0.2, z=0),
+            up=dict(x=0, y=0, z=1)), 
+        xaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+        yaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+        zaxis=dict(title=dict(font=dict(size=40)), showticklabels=False)
+        )
+)
+
+fig.show()
 
 # Stop timer 
 end = time.perf_counter()

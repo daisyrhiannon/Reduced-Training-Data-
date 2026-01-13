@@ -232,7 +232,7 @@ fig.update_layout(
     legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
-# fig.show()
+fig.show()
 
 # Stop timer 
 end = time.perf_counter()

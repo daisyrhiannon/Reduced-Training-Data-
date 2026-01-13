@@ -21,6 +21,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import copy
 from gpytorch.constraints import Interval
 import time 
+from codecarbon import EmissionsTracker
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -28,6 +29,11 @@ import plotly.io as pio
 
 # Sort out plotting 
 pio.renderers.default = 'browser'
+
+# # Codecarbon implementation 
+# tracker = EmissionsTracker(save_to_file=False)
+# start = time.perf_counter()
+# tracker.start()
 
 # Start timer 
 start = time.perf_counter()
@@ -47,7 +53,7 @@ x = np.hstack([x1o_flat,x2o_flat])
 # # Make training data 
 # # For random data within the strip 
 
-strip_width = 40
+strip_width = 20
 x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
@@ -226,7 +232,7 @@ def nMSE(ypred,ytest):
 
 error = MSE(observed_pred.mean.numpy(),y)
 errorN = nMSE(observed_pred.mean.numpy(),y)
-print(errorN)
+print(f"NMSE = {errorN}")
 
 # Plot results 
 prediction = go.Surface(
@@ -264,12 +270,25 @@ training = go.Scatter3d(
 fig = go.Figure(data=[prediction, original, training])
 fig.update_layout(
     title = f"NMSE = {errorN}",
-    legend=dict(
-        x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
+    legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
-        borderwidth=1))
-# fig.show()
+        borderwidth=1),
+    scene=dict(
+        xaxis_title="x1",
+        yaxis_title="x2",
+        zaxis_title="y")
+    )
+fig.show()
 
 # Stop timer 
 end = time.perf_counter()
 print(f"Runtime: {end - start:.6f} seconds")
+
+# # Codecarbon Results 
+# emissions = tracker.stop()
+# end = time.perf_counter()
+# energy_kwh = tracker._total_energy.kWh
+
+# print(f"Energy used: {energy_kwh:.6f} kWh")
+# print(f"Runtime: {end - start:.6f} seconds")
+# print(f"Emissions: {emissions} kg CO₂eq")

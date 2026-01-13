@@ -55,7 +55,7 @@ y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
 # For random data within the strip 
 n_train = strip_width*10
-rng = np.random.default_rng(12)
+rng = np.random.default_rng(222)
 random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
@@ -284,7 +284,7 @@ fig.update_layout(
         x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
         bordercolor='black',
         borderwidth=1))
-# fig.show()
+fig.show()
 
 # Stop timer 
 end = time.perf_counter()

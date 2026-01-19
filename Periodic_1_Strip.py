@@ -30,10 +30,10 @@ import plotly.io as pio
 # Sort out plotting 
 pio.renderers.default = 'browser'
 
-# # Codecarbon implementation 
-# tracker = EmissionsTracker(save_to_file=False)
-# start = time.perf_counter()
-# tracker.start()
+# Codecarbon implementation 
+tracker = EmissionsTracker(save_to_file=False)
+start = time.perf_counter()
+tracker.start()
 
 # Start timer 
 start = time.perf_counter()
@@ -53,14 +53,14 @@ x = np.hstack([x1o_flat,x2o_flat])
 # # Make training data 
 # # For random data within the strip 
 
-strip_width = 20
+strip_width = 40
 x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
 # For random data within the strip 
 n_train = strip_width*10
-rng = np.random.default_rng(222)
+rng = np.random.default_rng(12)
 random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
@@ -244,7 +244,7 @@ prediction = go.Surface(
     name='Prediction',
     opacity=0.9,
     showscale=False,
-    showlegend=True
+    showlegend=False
 )
 
 original = go.Surface(
@@ -255,7 +255,7 @@ original = go.Surface(
     name='Original', 
     opacity=0.7,
     showscale=False,
-    showlegend=True
+    showlegend=False
 )
 
 training = go.Scatter3d(
@@ -269,26 +269,40 @@ training = go.Scatter3d(
 
 fig = go.Figure(data=[prediction, original, training])
 fig.update_layout(
-    title = f"NMSE = {errorN}",
-    legend=dict(x=0, y=1, bgcolor='rgba(255,255,255,0.7)',
-        bordercolor='black',
-        borderwidth=1),
+    # title = f"NMSE = {errorN}",
+    # legend=dict(x=0.45, y=0.01, bgcolor='rgba(255,255,255,0.7)',
+    #     orientation="h",
+    #     bordercolor='black',
+    #     borderwidth=1,
+    #     xanchor="center",
+    #     yanchor="top",
+    #     font=dict(size=40),
+    #     itemsizing="constant"
+    #     ),
     scene=dict(
         xaxis_title="x1",
         yaxis_title="x2",
-        zaxis_title="y")
-    )
-fig.show()
+        zaxis_title="y",  
+        camera=dict(
+            eye=dict(x=1.25, y=1.25, z=1.25),
+            center=dict(x=0, y=0.2, z=0),
+            up=dict(x=0, y=0, z=1)), 
+        xaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+        yaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+        zaxis=dict(title=dict(font=dict(size=40)), showticklabels=False)
+        )
+)
+# fig.show()
 
 # Stop timer 
 end = time.perf_counter()
 print(f"Runtime: {end - start:.6f} seconds")
 
-# # Codecarbon Results 
-# emissions = tracker.stop()
-# end = time.perf_counter()
-# energy_kwh = tracker._total_energy.kWh
+# Codecarbon Results 
+emissions = tracker.stop()
+end = time.perf_counter()
+energy_kwh = tracker._total_energy.kWh
 
-# print(f"Energy used: {energy_kwh:.6f} kWh")
-# print(f"Runtime: {end - start:.6f} seconds")
-# print(f"Emissions: {emissions} kg CO₂eq")
+print(f"Energy used: {energy_kwh:.6f} kWh")
+print(f"Runtime: {end - start:.6f} seconds")
+print(f"Emissions: {emissions} kg CO₂eq")

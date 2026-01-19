@@ -48,7 +48,7 @@ x = np.hstack([x1o_flat,x2o_flat])
 # # Make training data 
 # # For random data within the strip 
 
-strip_width = 20
+strip_width = 60
 x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
@@ -79,41 +79,41 @@ y_train = y_train.ravel() + 0.01*np.random.randn(y_train.size)
 # x_test_scaled = (x - x_mean) / x_std
 
 
-# Visualise to check 
-original = go.Surface(
-    x = x1o, 
-    y = x2o, 
-    z = yo,
-    colorscale = 'greys', 
-    opacity = 0.9
-    )
+# # Visualise to check 
+# original = go.Surface(
+#     x = x1o, 
+#     y = x2o, 
+#     z = yo,
+#     colorscale = 'greys', 
+#     opacity = 0.9
+#     )
 
-training_scaled = go.Scatter3d(
-    x = x_train[:,0],
-    y = x_train[:,1],
-    z = y_train,
-    mode = 'markers',
-    )
+# training_scaled = go.Scatter3d(
+#     x = x_train[:,0],
+#     y = x_train[:,1],
+#     z = y_train,
+#     mode = 'markers',
+#     )
 
-fig = go.Figure(data=[original])
-fig.update_layout(
-    scene=dict(
-        xaxis_title="x1",
-        yaxis_title="x2",
-        zaxis_title="y",
-        xaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
-        yaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
-        zaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
-        camera=dict(
-            eye=dict(x=1.25, y=1.25, z=1.25),
-            center=dict(x=0, y=0.2, z=0),
-            up=dict(x=0, y=0, z=1)), 
+# fig = go.Figure(data=[original])
+# fig.update_layout(
+#     scene=dict(
+#         xaxis_title="x1",
+#         yaxis_title="x2",
+#         zaxis_title="y",
+#         xaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+#         yaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+#         zaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
+#         camera=dict(
+#             eye=dict(x=1.25, y=1.25, z=1.25),
+#             center=dict(x=0, y=0.2, z=0),
+#             up=dict(x=0, y=0, z=1)), 
         
-    )
-)
+#     )
+# )
 
 
-fig.show()
+# fig.show()
 
 # Make tensors 
 x_train_scaled_tensor = torch.from_numpy(x_train).float()
@@ -270,7 +270,7 @@ fig.update_layout(
         )
 )
 
-fig.show()
+# fig.show()
 
 # Stop timer 
 end = time.perf_counter()

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jan 19 16:51:57 2026
+Created on Wed Jan 21 13:34:14 2026
 
 @author: mep24db
 """
@@ -48,7 +48,7 @@ Y, T = np.meshgrid(x_coords, secs)
 x_test = np.hstack((Y.ravel().reshape(-1,1),T.ravel().reshape(-1,1)))
 
 # Make training data 
-strip = 3
+strip = 6
 top = 30 * strip
 
 y_train = Y[0:top:10,:].ravel().reshape(-1,1)
@@ -65,6 +65,7 @@ x_train = np.hstack((y_train,secs_train))
 # secs_strip = T[:10*strip_width, :].ravel().reshape(-1, 1)
 # z_strip  = Z[:10*strip_width, :].ravel().reshape(-1, 1)
 
+# # For random data within the strip 
 # n_train = strip_width*5
 # rng = np.random.default_rng(222)
 # random_indices = rng.choice(strip_width*10, n_train, replace = False)
@@ -150,7 +151,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
     
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
-#  likelihood.noise = torch.tensor(1e-1)
+# likelihood.noise = torch.tensor(1e-1)
 model = ExactGPModel(x_train_tensor, z_train_tensor, likelihood)
 
 
@@ -160,7 +161,10 @@ rbf = product.kernels[0]
 period = product.kernels[1] 
 
 f = 10.25355
-period.period_length = torch.tensor(1 / f).float() # For fixed period
+real_period = 1 / f
+period.raw_period_length_constraint = Interval(real_period*0.9, real_period*1.1)
+startpoint_period = (real_period*0.9) + ((real_period*1.1)-(real_period*0.9)) * torch.rand_like(torch.tensor(real_period*0.9))
+model.covar_module.initialize(outputscale = startpoint_period)
 
 # period.lengthscale = torch.tensor(1).float() # for fixed lengthscales 
 # lower2 = torch.tensor(1)
@@ -186,7 +190,7 @@ period.period_length = torch.tensor(1 / f).float() # For fixed period
 
 
 # Fix some hyperparameters 
-period.raw_period_length.requires_grad_(False)
+# period.raw_period_length.requires_grad_(False)
 
 # Find optimal model hyperparameters
 model.train()
@@ -287,7 +291,7 @@ fig.update_layout(
     scene=dict(
         xaxis_title="Time",
         yaxis_title="Position",
-        zaxis_title="Acceleration",  
+        zaxis_title="Acceleration", 
         camera=dict(
             eye=dict(x=1.25, y=1.25, z=1.25),
             center=dict(x=0, y=0.2, z=0),
@@ -302,4 +306,4 @@ fig.update_layout(
 
 # Stop timer 
 end = time.perf_counter()
-print(f"Runtime: {end - begin:.3f} seconds")
+print(f"Runtime: {end - begin:.6f} seconds")

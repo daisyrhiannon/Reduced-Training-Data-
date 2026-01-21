@@ -5,16 +5,24 @@ Created on Mon Jan 19 15:35:53 2026
 @author: mep24db
 """
 
+# Tell it not to use GPU 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+
 import pandas as pd 
 import numpy as np 
 import plotly.graph_objects as go
 import plotly.io as pio
 import gpytorch
 import torch 
-
+import time 
 
 # Sort out plotting 
 pio.renderers.default = 'browser'
+
+# Start timer 
+begin = time.perf_counter()
 
 
 # Import data 
@@ -32,17 +40,20 @@ disp_21_LE = data.iloc[start:end,4].to_numpy().reshape(-1,1)
 Z = np.hstack((disp_21_LE,disp_21_C,disp_21_TR))
 z = Z.ravel()
 x_coords = locs.iloc[0,[5,10,15]].to_numpy(dtype=np.float64)
-time = data.iloc[start:end,0].to_numpy()
-Y, T = np.meshgrid(x_coords, time)
+secs = data.iloc[start:end,0].to_numpy()
+Y, T = np.meshgrid(x_coords, secs)
 
 x_test = np.hstack((Y.ravel().reshape(-1,1),T.ravel().reshape(-1,1)))
 
 # Make training data 
-y_train = Y[0:100:10,:].ravel().reshape(-1,1)
-time_train = T[0:100:10,:].ravel().reshape(-1,1)
-z_train = Z[0:100:10,:].ravel()
+strip = 7
+top = 30 * strip
 
-x_train = np.hstack((y_train,time_train))
+y_train = Y[0:top:10,:].ravel().reshape(-1,1)
+secs_train = T[0:top:10,:].ravel().reshape(-1,1)
+z_train = Z[0:top:10,:].ravel()
+
+x_train = np.hstack((y_train,secs_train))
 
 
 # # Plot to check 
@@ -155,13 +166,13 @@ def MSE(ypred,ytest):
     return MSE
 
 def nMSE(ypred,ytest):
-    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
+    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.var(ytest))
     return nMSE
    
 error = MSE(observed_pred.mean.numpy(),z) 
 errorN = nMSE(observed_pred.mean.numpy(),z)
 
-print(errorN)
+print(f"NMSE = {errorN}")
 
 # Plot results 
 prediction = go.Surface(
@@ -187,7 +198,7 @@ original = go.Surface(
 )
 
 training = go.Scatter3d(
-    x=time_train.ravel(),
+    x = secs_train.ravel(),
     y=y_train.ravel(), 
     z=z_train.ravel(), 
     mode='markers', 
@@ -209,9 +220,9 @@ fig.update_layout(
     #     itemsizing="constant"
     #     ),
     scene=dict(
-        xaxis_title="x1",
-        yaxis_title="x2",
-        zaxis_title="y",  
+        xaxis_title="Time",
+        yaxis_title="Position",
+        zaxis_title="Acceleration",  
         camera=dict(
             eye=dict(x=1.25, y=1.25, z=1.25),
             center=dict(x=0, y=0.2, z=0),
@@ -222,4 +233,8 @@ fig.update_layout(
         )
 )
 
-fig.show()
+# fig.show()
+
+# Stop timer 
+end = time.perf_counter()
+print(f"Runtime: {end - begin:.3f} seconds")

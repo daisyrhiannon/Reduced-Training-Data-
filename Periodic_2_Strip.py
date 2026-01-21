@@ -48,14 +48,14 @@ x = np.hstack([x1o_flat,x2o_flat])
 # # Make training data 
 # # For random data within the strip 
 
-strip_width = 10
+strip_width = 20
 x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
 # For random data within the strip 
 n_train = strip_width*10
-rng = np.random.default_rng(222)
+rng = np.random.default_rng(897)
 random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
@@ -234,7 +234,7 @@ def MSE(ypred,ytest):
     return MSE
 
 def nMSE(ypred,ytest):
-    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.std(ytest))
+    nMSE = 100*(np.mean(((ypred-ytest)**2))/np.var(ytest))
     return nMSE
    
 # error = MSE(results_unscaled.numpy(),y) 
@@ -242,7 +242,7 @@ def nMSE(ypred,ytest):
 
 error = MSE(observed_pred.mean.numpy(),y)
 errorN = nMSE(observed_pred.mean.numpy(),y)
-print(errorN)
+print(f"NMSE = {errorN}")
 
 # Plot results 
 prediction = go.Surface(

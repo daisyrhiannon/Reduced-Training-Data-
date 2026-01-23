@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec 19 13:25:25 2025
+Created on Fri Jan 23 13:43:27 2026
 
 @author: mep24db
 """
-
 
 # Tell it not to use GPU 
 import os
@@ -55,7 +54,7 @@ y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
 # For random data within the strip 
 n_train = strip_width*10
-rng = np.random.default_rng(222)
+rng = np.random.default_rng(897)
 random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
@@ -137,7 +136,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
-likelihood.noise = torch.tensor(1e-4)
+# likelihood.noise = torch.tensor(1e-4)
 model = ExactGPModel(x_train, y_train, likelihood)
 
 
@@ -155,32 +154,32 @@ period.period_length = torch.tensor(2 * np.pi / f).float() # For fixed period
 
 
 
-# period.lengthscale = torch.tensor(1).float() # for fixed lengthscales 
-lower2 = torch.tensor(1)
-upper2 = torch.tensor(3)
-startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
-period.initialize(lengthscale=startpoint2)
+# # period.lengthscale = torch.tensor(1).float() # for fixed lengthscales 
+# lower2 = torch.tensor(1)
+# upper2 = torch.tensor(3)
+# startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
+# period.initialize(lengthscale=startpoint2)
 
-# rbf.lengthscale = torch.tensor(0.2).float() # For fixed lengthscales 
-lower = torch.tensor(0.1)
-upper = torch.tensor(1)
-startpoint = lower+(upper-lower)*torch.rand(1)
-rbf.raw_lengthscale_constraint = Interval(lower, upper)
-rbf.initialize(lengthscale=startpoint)
+# # rbf.lengthscale = torch.tensor(0.2).float() # For fixed lengthscales 
+# lower = torch.tensor(0.1)
+# upper = torch.tensor(1)
+# startpoint = lower+(upper-lower)*torch.rand(1)
+# rbf.raw_lengthscale_constraint = Interval(lower, upper)
+# rbf.initialize(lengthscale=startpoint)
 
 
-# model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
-vary = np.var(y)
-model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
-startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
-model.covar_module.initialize(outputscale =startpoint_var)
+# # model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
+# vary = np.var(y)
+# model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
+# startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
+# model.covar_module.initialize(outputscale =startpoint_var)
 
-model.mean_module.constant = torch.tensor(np.mean(y)).float()
+# model.mean_module.constant = torch.tensor(np.mean(y)).float()
 
 
 # Fix some hyperparameters 
 period.raw_period_length.requires_grad_(False)
-model.likelihood.raw_noise.requires_grad_(False)
+# model.likelihood.raw_noise.requires_grad_(False)
 # period.raw_lengthscale.requires_grad_(False)
 # rbf.raw_lengthscale.requires_grad_(False)
 # model.covar_module.raw_outputscale.requires_grad_(False)

@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jan 19 15:35:53 2026
+Created on Fri Jan 23 15:20:37 2026
 
 @author: mep24db
 """
 
+
 # Tell it not to use GPU 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
 
 import pandas as pd 
 import numpy as np 
@@ -16,14 +16,16 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import gpytorch
 import torch 
+from gpytorch.constraints import Interval
 import time 
+
 
 # Sort out plotting 
 pio.renderers.default = 'browser'
 
+
 # Start timer 
 begin = time.perf_counter()
-
 
 # Import data 
 data = pd.read_csv('Sine10.25_0.1_5_data.csv')
@@ -46,7 +48,7 @@ Y, T = np.meshgrid(x_coords, secs)
 x_test = np.hstack((Y.ravel().reshape(-1,1),T.ravel().reshape(-1,1)))
 
 # Make training data 
-strip = 7
+strip = 5
 top = 30 * strip
 
 y_train = Y[0:top:10,:].ravel().reshape(-1,1)
@@ -54,6 +56,31 @@ secs_train = T[0:top:10,:].ravel().reshape(-1,1)
 z_train = Z[0:top:10,:].ravel()
 
 x_train = np.hstack((y_train,secs_train))
+
+# # # Make training data 
+# # # For random data within the strip 
+
+# strip_width = 30
+# y_strip = Y[:10*strip_width, :].ravel().reshape(-1, 1)
+# secs_strip = T[:10*strip_width, :].ravel().reshape(-1, 1)
+# z_strip  = Z[:10*strip_width, :].ravel().reshape(-1, 1)
+
+# # For random data within the strip 
+# n_train = strip_width*5
+# rng = np.random.default_rng(222)
+# random_indices = rng.choice(strip_width*10, n_train, replace = False)
+
+# y_train = y_strip[random_indices]
+# secs_train = secs_strip[random_indices]
+# z_train_1 = z_strip[random_indices]
+
+ 
+# x_train = np.hstack([y_train, secs_train])
+# z_train = z_train_1.ravel() # + 0.01*np.random.randn(y_train.size)
+
+
+
+
 
 
 # # Plot to check 
@@ -69,26 +96,24 @@ x_train = np.hstack((y_train,secs_train))
 #         opacity = 0.7,
 #         showscale=False,
 #         showlegend=False
-
-
 #     )
 # )
 
-# # fig.add_trace(
-# #     go.Scatter3d(
-# #         x = time_train, 
-# #         y = y_train, 
-# #         z = z_train, 
-# #         mode = 'markers',
-# #         marker=dict(size=5)
-# #     )
-# # )
+# fig.add_trace(
+#     go.Scatter3d(
+#         x = time_train.ravel(), 
+#         y = y_train.ravel(), 
+#         z = z_train, 
+#         mode = 'markers',
+#         marker=dict(size=5)
+#     )
+# )
 
 # fig.update_layout(
 #     scene=dict(
-#         xaxis_title="Time",
-#         yaxis_title="Position",
-#         zaxis_title="Acceleration",  
+#         xaxis_title="x1",
+#         yaxis_title="x2",
+#         zaxis_title="y",  
 #         camera=dict(
 #             eye=dict(x=1.25, y=1.25, z=1.25),
 #             center=dict(x=0, y=0.2, z=0),
@@ -102,18 +127,21 @@ x_train = np.hstack((y_train,secs_train))
 
 # fig.show()
 
+
 x_train_tensor = torch.from_numpy(x_train).float()
 z_train_tensor = torch.from_numpy(z_train).float()
 
 x_test_tensor = torch.from_numpy(x_test).float()
-
 
 # Define model 
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, x_train, y_train, likelihood):
         super(ExactGPModel, self).__init__(x_train, y_train, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        period = gpytorch.kernels.PeriodicKernel(active_dims = [1])
+        rbf = gpytorch.kernels.RBFKernel(active_dims = [0])
+        product = rbf*period
+        self.covar_module = gpytorch.kernels.ScaleKernel(product)
      
 
     def forward(self, x):
@@ -123,9 +151,47 @@ class ExactGPModel(gpytorch.models.ExactGP):
     
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
-# likelihood.noise = torch.tensor(1e-4)
+likelihood.noise = torch.tensor(1e-2)
 model = ExactGPModel(x_train_tensor, z_train_tensor, likelihood)
 
+
+# set hyperparameters and bounds
+product = model.covar_module.base_kernel
+rbf = product.kernels[0]   
+period = product.kernels[1] 
+
+f = 10.25355
+real_period = 1 / f
+period.raw_period_length_constraint = Interval(real_period*0.9, real_period*1.1)
+startpoint_period = (real_period*0.9) + ((real_period*1.1)-(real_period*0.9)) * torch.rand_like(torch.tensor(real_period*0.9))
+model.covar_module.initialize(outputscale = startpoint_period)
+
+# period.lengthscale = torch.tensor(1).float() # for fixed lengthscales 
+lower2 = torch.tensor(4)
+upper2 = torch.tensor(6)
+startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
+period.initialize(lengthscale=startpoint2)
+
+# rbf.lengthscale = torch.tensor(100).float() # For fixed lengthscales 
+lower = torch.tensor(2)
+upper = torch.tensor(3)
+startpoint = lower+(upper-lower)*torch.rand(1)
+rbf.raw_lengthscale_constraint = Interval(lower, upper)
+rbf.initialize(lengthscale=startpoint)
+
+
+# model.covar_module.outputscale = torch.tensor(np.var(z)).float() # For fixed variance
+vary = np.var(z)
+model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
+startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
+model.covar_module.initialize(outputscale =startpoint_var)
+
+model.mean_module.constant = torch.tensor(np.mean(z)).float()
+
+
+# Fix some hyperparameters 
+model.likelihood.raw_noise.requires_grad_(False)
+# period.raw_period_length.requires_grad_(False)
 
 # Find optimal model hyperparameters
 model.train()
@@ -143,16 +209,18 @@ model.train()
 likelihood.train()
 
 
-for i in range(training_iter): 
-    # Zero gradients from previous iteration 
-    optimizer.zero_grad() 
-    # Output from model 
-    output = model(x_train_tensor) 
-    # Calc loss and backprop gradients 
-    loss = -mll(output, z_train_tensor) 
-    loss.backward() 
-    print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Lengthscale: %.3f' % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), model.covar_module.base_kernel.lengthscale.item()))
-    optimizer.step()
+with gpytorch.settings.cholesky_jitter(1e-1): 
+    for i in range(training_iter): 
+        # Zero gradients from previous iteration 
+        optimizer.zero_grad() 
+        # Output from model 
+        output = model(x_train_tensor) 
+        # Calc loss and backprop gradients 
+        loss = -mll(output, z_train_tensor) 
+        loss.backward() 
+        ls = rbf.lengthscale.detach().cpu().numpy()
+        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Period: %.3f  - Period Lengthscale: %3f - RBF Lengthscale: %3f'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), period.period_length.item(), period.lengthscale.item(), rbf.lengthscale.item()))
+        optimizer.step()
         
     
 # Get into evaluation (predictive posterior) mode
@@ -174,7 +242,7 @@ def nMSE(ypred,ytest):
 error = MSE(observed_pred.mean.numpy(),z) 
 errorN = nMSE(observed_pred.mean.numpy(),z)
 
-print(f"NMSE = {errorN}")
+print(errorN)
 
 # Plot results 
 prediction = go.Surface(
@@ -200,7 +268,7 @@ original = go.Surface(
 )
 
 training = go.Scatter3d(
-    x = secs_train.ravel(),
+    x=secs_train.ravel(),
     y=y_train.ravel(), 
     z=z_train.ravel(), 
     mode='markers', 
@@ -224,7 +292,7 @@ fig.update_layout(
     scene=dict(
         xaxis_title="Time",
         yaxis_title="Position",
-        zaxis_title="Acceleration",  
+        zaxis_title="Acceleration", 
         camera=dict(
             eye=dict(x=1.25, y=1.25, z=1.25),
             center=dict(x=0, y=0.2, z=0),
@@ -239,4 +307,4 @@ fig.update_layout(
 
 # Stop timer 
 end = time.perf_counter()
-print(f"Runtime: {end - begin:.3f} seconds")
+print(f"Runtime: {end - begin:.6f} seconds")

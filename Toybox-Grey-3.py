@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec 19 13:25:25 2025
+Created on Fri Jan 23 10:44:37 2026
 
 @author: mep24db
 """
-
 
 # Tell it not to use GPU 
 import os
@@ -21,6 +20,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import copy
 from gpytorch.constraints import Interval
 import time 
+from codecarbon import EmissionsTracker
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -28,6 +28,11 @@ import plotly.io as pio
 
 # Sort out plotting 
 pio.renderers.default = 'browser'
+
+# # Codecarbon implementation 
+# tracker = EmissionsTracker(save_to_file=False)
+# start = time.perf_counter()
+# tracker.start()
 
 # Start timer 
 start = time.perf_counter()
@@ -44,38 +49,23 @@ x2o_flat = x2o.ravel().reshape(-1,1)
 y = yo.ravel()+0.01*np.random.randn(x1o_flat.size)
 x = np.hstack([x1o_flat,x2o_flat])
 
-
 # # Make training data 
 # # For random data within the strip 
 
-strip_width = 20
+strip_width = 60
 x1_strip = x1o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 x2_strip = x2o[:, 100-strip_width:100].ravel().reshape(-1, 1)
 y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
 # For random data within the strip 
 n_train = strip_width*10
-rng = np.random.default_rng(222)
+rng = np.random.default_rng(897)
 random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
 x2_train = x2_strip[random_indices]
 y_train = y_strip[random_indices]
 
- 
-train_x = np.hstack([x1_train, x2_train])
-train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)
-
-
-# # Make training data
-# # For organised grid within the strip 
-# x1_strip = x1o[:,50:100]
-# x2_strip = x2o[:,50:100]
-# y_strip = yo[:,50:100]
-
-# x1_train = x1_strip[::9].ravel()[::5].reshape(-1,1) # first slice controls how many rows parallel to x, second is how many rows parallel to y 
-# x2_train = x2_strip[::9].ravel()[::5].reshape(-1,1)
-# y_train = y_strip [::9].ravel()[::5].reshape(-1,1)
  
 train_x = np.hstack([x1_train, x2_train])
 train_y = y_train.ravel() + 0.01*np.random.randn(y_train.size)
@@ -137,7 +127,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 # initialize likelihood and model 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
-likelihood.noise = torch.tensor(1e-4)
+# likelihood.noise = torch.tensor(1e-4)
 model = ExactGPModel(x_train, y_train, likelihood)
 
 
@@ -146,41 +136,40 @@ product = model.covar_module.base_kernel
 rbf = product.kernels[0]   
 period = product.kernels[1] 
 
-period.period_length = torch.tensor(2 * np.pi / f).float() # For fixed period
+# period.period_length = torch.tensor(2 * np.pi / f).float() # For fixed period
 
-# real_period = 2*np.pi / f
-# period.raw_period_length_constraint = Interval(real_period*0.9, real_period*1.1)
-# startpoint_period = (real_period*0.9) + ((real_period*1.1)-(real_period*0.9)) * torch.rand_like(torch.tensor(real_period*0.9))
-# model.covar_module.initialize(outputscale = startpoint_period)
-
-
-
-# period.lengthscale = torch.tensor(1).float() # for fixed lengthscales 
-lower2 = torch.tensor(1)
-upper2 = torch.tensor(3)
-startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
-period.initialize(lengthscale=startpoint2)
-
-# rbf.lengthscale = torch.tensor(0.2).float() # For fixed lengthscales 
-lower = torch.tensor(0.1)
-upper = torch.tensor(1)
-startpoint = lower+(upper-lower)*torch.rand(1)
-rbf.raw_lengthscale_constraint = Interval(lower, upper)
-rbf.initialize(lengthscale=startpoint)
+real_period = 2*np.pi / f
+period.raw_period_length_constraint = Interval(real_period*0.9, real_period*1.1)
+startpoint_period = (real_period*0.9) + ((real_period*1.1)-(real_period*0.9)) * torch.rand_like(torch.tensor(real_period*0.9))
+model.covar_module.initialize(outputscale = startpoint_period)
 
 
-# model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
-vary = np.var(y)
-model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
-startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
-model.covar_module.initialize(outputscale =startpoint_var)
 
-model.mean_module.constant = torch.tensor(np.mean(y)).float()
+# # period.lengthscale = torch.tensor(1).float() # for fixed lengthscales 
+# lower2 = torch.tensor(1)
+# upper2 = torch.tensor(3)
+# startpoint2 = lower2 + ((upper2-lower2))* torch.rand(1)
+# period.initialize(lengthscale=startpoint2)
+
+# # rbf.lengthscale = torch.tensor(0.2).float() # For fixed lengthscales 
+# lower = torch.tensor(0.1)
+# upper = torch.tensor(1)
+# startpoint = lower+(upper-lower)*torch.rand(1)
+# rbf.raw_lengthscale_constraint = Interval(lower, upper)
+# rbf.initialize(lengthscale=startpoint)
+
+# # model.covar_module.outputscale = torch.tensor(np.var(y)).float() # For fixed variance
+# vary = np.var(y)
+# model.covar_module.raw_outputscale_constraint = Interval(vary*0.9, vary*1.1)
+# startpoint_var = (vary*0.9) + ((vary*1.1)-(vary*0.9)) * torch.rand_like(torch.tensor(vary*0.9))
+# model.covar_module.initialize(outputscale =startpoint_var)
+
+# model.mean_module.constant = torch.tensor(np.mean(y)).float()
 
 
 # Fix some hyperparameters 
-period.raw_period_length.requires_grad_(False)
-model.likelihood.raw_noise.requires_grad_(False)
+# model.mean_module.constant.requires_grad_(False)
+# period.raw_period_length.requires_grad_(False)
 # period.raw_lengthscale.requires_grad_(False)
 # rbf.raw_lengthscale.requires_grad_(False)
 # model.covar_module.raw_outputscale.requires_grad_(False)
@@ -212,7 +201,7 @@ with gpytorch.settings.cholesky_jitter(1e-1):
         loss = -mll(output, y_train) 
         loss.backward() 
         ls = rbf.lengthscale.detach().cpu().numpy()
-        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Period: %.3f  - Period Lengthscale: %3f - RBF Lengthscale: %3f - Mean: %3f'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), period.period_length.item(), period.lengthscale.item(), rbf.lengthscale.item(), model.mean_module.constant.item()))
+        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Period: %.3f  - Period Lengthscale: %3f - RBF Lengthscale: %3f - Mean: %.3f'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), period.period_length.item(), period.lengthscale.item(), rbf.lengthscale.item(), model.mean_module.constant.item()))
         optimizer.step()
             
     
@@ -255,7 +244,7 @@ prediction = go.Surface(
     name='Prediction',
     opacity=0.9,
     showscale=False,
-    showlegend=True
+    showlegend=False
 )
 
 original = go.Surface(
@@ -266,7 +255,7 @@ original = go.Surface(
     name='Original', 
     opacity=0.7,
     showscale=False,
-    showlegend=True
+    showlegend=False
 )
 
 training = go.Scatter3d(
@@ -302,9 +291,18 @@ fig.update_layout(
         yaxis=dict(title=dict(font=dict(size=40)), showticklabels=False),
         zaxis=dict(title=dict(font=dict(size=40)), showticklabels=False)
         )
-    )
+)
 # fig.show()
 
 # Stop timer 
 end = time.perf_counter()
 print(f"Runtime: {end - start:.6f} seconds")
+
+# # Codecarbon Results 
+# emissions = tracker.stop()
+# end = time.perf_counter()
+# energy_kwh = tracker._total_energy.kWh
+
+# print(f"Energy used: {energy_kwh:.6f} kWh")
+# print(f"Runtime: {end - start:.6f} seconds")
+# print(f"Emissions: {emissions} kg CO₂eq")

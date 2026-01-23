@@ -60,7 +60,7 @@ y_strip  = yo[:,  100-strip_width:100].ravel().reshape(-1, 1)
 
 # For random data within the strip 
 n_train = strip_width*10
-rng = np.random.default_rng(897)
+rng = np.random.default_rng(222)
 random_indices = rng.choice(strip_width*100, n_train, replace = False)
 
 x1_train = x1_strip[random_indices]
@@ -169,6 +169,8 @@ model.mean_module.constant = torch.tensor(np.mean(y)).float()
 
 
 # Fix some hyperparameters 
+# model.mean_module.constant.requires_grad_(False)
+model.likelihood.raw_noise.requires_grad_(False)
 # period.raw_period_length.requires_grad_(False)
 # period.raw_lengthscale.requires_grad_(False)
 # rbf.raw_lengthscale.requires_grad_(False)
@@ -201,7 +203,7 @@ with gpytorch.settings.cholesky_jitter(1e-1):
         loss = -mll(output, y_train) 
         loss.backward() 
         ls = rbf.lengthscale.detach().cpu().numpy()
-        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Period: %.3f  - Period Lengthscale: %3f - RBF Lengthscale: %3f'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), period.period_length.item(), period.lengthscale.item(), rbf.lengthscale.item()))
+        print('Iter %d/%d - Loss: %.3f  -  Noise: %.3f - Signal Variance: %.3f - Period: %.3f  - Period Lengthscale: %3f - RBF Lengthscale: %3f - Mean: %.3f'  % ( i + 1, training_iter, loss.item(),  model.likelihood.noise.item(), model.covar_module.outputscale.item(), period.period_length.item(), period.lengthscale.item(), rbf.lengthscale.item(), model.mean_module.constant.item()))
         optimizer.step()
             
     

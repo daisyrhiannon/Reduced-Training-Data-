@@ -27,49 +27,72 @@ end = 1000
 disp_21_C = data.iloc[start:end,3].to_numpy().ravel()
 time = data.iloc[start:end,0].to_numpy().ravel()
 
-z = disp_21_C - np.mean(disp_21_C)
-
 dx = time[1] - time[0]
-fft_vals = np.abs(rfft(z))
-freqs = rfftfreq(len(z), dx)
-# freq = freqs[np.argmax(fft_vals[1:]) + 1]  # skip zero freq
 
-freq = 10.25355
-# print("Frequency:", freq)
+z = disp_21_C - np.mean(disp_21_C)
+fft = rfft(z) 
 
-fft = rfft(z)
-k = np.argmax(np.abs(fft[1:])) + 1
+power=np.abs(fft)**2
 
-# freq = freqs[k]
-phase = 3.5
-amplitude = 2 * np.abs(fft[k]) / len(z)
+freqs = rfftfreq(len(z),dx)
 
-y_fit = amplitude * np.cos(2 * np.pi * freq * time + phase)
+k_peak = np.argmax(power[1:]) + 1
 
+mask = np.ones_like(power, dtype=bool)
+mask[k_peak-2:k_peak+3] = False  # exclude peak + neighbors
+
+noise_power_spectral = np.median(power[mask])
 
 
+N = len(z)
+noise_variance = 2 * noise_power_spectral / N
+noise_std = np.sqrt(noise_variance)
+
+print("Estimated noise std:", noise_std)
+
+
+
+# dx = time[1] - time[0]
+# fft_vals = np.abs(rfft(z))
+# freqs = rfftfreq(len(z), dx)
+# # freq = freqs[np.argmax(fft_vals[1:]) + 1]  # skip zero freq
+
+# freq = 10.25355
+# # print("Frequency:", freq)
+
+# fft = rfft(z)
+# k = np.argmax(np.abs(fft[1:])) + 1
+
+# # freq = freqs[k]
+# phase = 3.5
+# amplitude = 2 * np.abs(fft[k]) / len(z)
+
+# y_fit = amplitude * np.cos(2 * np.pi * freq * time + phase)
 
 
 
 
-fig = go.Figure()
-
-fig.add_trace(
-    go.Scatter(
-        x = time, 
-        y = disp_21_C, 
-        mode = "lines"
-    )
-)
 
 
-fig.add_trace(
-    go.Scatter( 
-        x = time, 
-        y = y_fit, 
-        mode = "lines"
-        )
-    )
+
+# fig = go.Figure()
+
+# fig.add_trace(
+#     go.Scatter(
+#         x = time, 
+#         y = disp_21_C, 
+#         mode = "lines"
+#     )
+# )
 
 
-fig.show()
+# fig.add_trace(
+#     go.Scatter( 
+#         x = time, 
+#         y = y_fit, 
+#         mode = "lines"
+#         )
+#     )
+
+
+# fig.show()
